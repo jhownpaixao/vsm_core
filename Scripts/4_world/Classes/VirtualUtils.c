@@ -117,4 +117,24 @@ class VirtualUtils
 		}
 		return files;
 	}
+
+	static bool IsPlayerNearby(vector position, float radius)
+	{
+		array<Object> objects = {};
+		GetGame().GetObjectsAtPosition(position, radius, objects, NULL);
+
+		foreach (Object obj : objects)
+		{
+			if (obj.IsKindOf("PlayerBase"))
+			{
+				PlayerBase player = PlayerBase.Cast(obj);
+				if (player && player.IsAlive())
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
 }

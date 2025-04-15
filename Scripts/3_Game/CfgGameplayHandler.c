@@ -17,14 +17,24 @@ modded class CfgGameplayHandler
 		return m_Data.VSMData.enableDebug;
 	}
 	//----------------------------------------------------------------------------------
-	static bool GetVSM_EnableAutoClose()
+	static bool GetVSM_AutoCloseEnable()
 	{
-		return m_Data.VSMData.enableAutoClose;
+		return m_Data.VSMData.autoCloseEnable;
 	}
 	//----------------------------------------------------------------------------------
-	static int GetVSM_TimeToAutoClose()
+	static int GetVSM_AutoCloseInterval()
 	{
-		return m_Data.VSMData.timeToAutoClose;
+		return m_Data.VSMData.autoCloseInterval;
+	} 
+	//----------------------------------------------------------------------------------
+	static int GetVSM_AutoClosePlayerDistance()
+	{
+		return m_Data.VSMData.autoClosePlayerDistance;
+	} 
+	//----------------------------------------------------------------------------------
+	static bool GetVSM_AutoCloseIgnorePlayerNearby()
+	{
+		return m_Data.VSMData.autoCloseIgnorePlayerNearby;
 	} 
 	//----------------------------------------------------------------------------------
 	static int GetVSM_BatchSize()
@@ -40,6 +50,11 @@ modded class CfgGameplayHandler
 	static int GetVSM_IncludeDecayItems()
 	{
 		return m_Data.VSMData.includeDecayItems;
+	} 
+	//----------------------------------------------------------------------------------
+	static TStringArray GetVSM_IgnoredItems()
+	{
+		return m_Data.VSMData.ignoredItems;
 	} 
 	//----------------------------------------------------------------------------------
 

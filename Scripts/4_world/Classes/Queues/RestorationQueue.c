@@ -84,6 +84,8 @@ class VSM_RestorationQueue
     {
         VirtualStorageModule.GetModule().RemoveActiveRestoration(this);
         m_Container.VSM_OnAfterContainerRestore();
+		m_Container.VSM_SetIsProcessing(false);
+
         if (m_Debug)
             Print("VSM_RestorationQueue " + m_Container.GetType() + " carregamento parado");
     }
@@ -91,6 +93,8 @@ class VSM_RestorationQueue
     void OnComplete()
     {
         m_Container.VSM_OnAfterContainerRestore();
+        m_Container.VSM_SetHasItems(false);
+		m_Container.VSM_SetIsProcessing(false);
 
         if (m_Debug)
             Print("VSM_RestorationQueue " + m_Container.GetType() + " carregamento concluído");
@@ -107,6 +111,7 @@ class VSM_RestorationQueue
             return;
         }
         OnStart();
+        OnTick(); // tick inicial
         GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(this.OnTick, m_TickInterval, true);
     }
 

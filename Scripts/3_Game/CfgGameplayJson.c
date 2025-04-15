@@ -18,10 +18,15 @@ class ITEM_VSMData : ITEM_DataBase
 	
 	//-------------------------------------------------------------------------------------------------
 	//!!! all member variables must correspond with the cfggameplay.json file contents !!!!
-	bool enableDebug = true;
-	bool enableAutoClose = true;
+	bool  autoCloseEnable 				= true;
+	bool  autoCloseIgnorePlayerNearby 	= true;
+	float autoClosePlayerDistance 		= 8.0;
+	int   autoCloseInterval				= 120; // seconds
+
+	int  batchSize 		= 20;
+	int  batchInterval 	= 1; // seconds
 	bool includeDecayItems = false;
-	int timeToAutoClose = 120; // seconds
-	int batchSize = 20;
-	int batchInterval = 1; // seconds
+	ref TStringArray ignoredItems = {}; 
+
+	bool enableDebug = false;
 };

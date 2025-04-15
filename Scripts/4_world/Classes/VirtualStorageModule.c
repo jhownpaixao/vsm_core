@@ -14,9 +14,9 @@ class VirtualStorageModule : CF_ModuleWorld
 		sm_Instance = this;
 		m_IsLoaded = false;
 
-		bool autoClose = CfgGameplayHandler.GetVSM_EnableAutoClose();
+		bool autoClose = CfgGameplayHandler.GetVSM_AutoCloseEnable();
 		m_Debug = CfgGameplayHandler.GetVSM_EnableDebug(); // update
-		Log("Constructor", "Starting VirtualStorageModule: m_Debug=" + m_Debug + " autoClose=" + autoClose + " time=" + CfgGameplayHandler.GetVSM_TimeToAutoClose());
+		Log("Constructor", "Starting VirtualStorageModule: m_Debug=" + m_Debug + " autoClose=" + autoClose + " time=" + CfgGameplayHandler.GetVSM_AutoCloseInterval());
 	}
 
 #ifdef SERVER
@@ -63,23 +63,38 @@ class VirtualStorageModule : CF_ModuleWorld
 		}
 
 
+
 		string virtualFile = GetVirtualFile(container);
 
 		Log("OnInitContainer", " iniciando virtual para " + container.GetType() + " aberto? " + container.VSM_IsOpen());
 
+		container.VSM_SetVirtualLoaded(true);
+
 		if (container.VSM_IsOpen())
 		{
 			Log("OnInitContainer", "container aberto, fechando..." + container.GetType());
-			container.VSM_SetVirtualLoaded(true);
 			container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
-			return;
 		}
-
-		container.VSM_SetVirtualLoaded(true);
-		if (!FileExist(virtualFile))
+		else
 		{
-			Error("OnInitContainer", "o arquivo de storage não existe " + container.GetType() + " chamando save");
-			OnSaveVirtualStore(container);
+			if (!FileExist(virtualFile))
+			{
+				Log("OnInitContainer", "o arquivo de storage não existe " + container.GetType() + " chamando save");
+				OnSaveVirtualStore(container);
+			}
+			else
+			{
+				FileSerializer serializer = new FileSerializer();
+				VirtualStorageFile virtualStorage = new VirtualStorageFile();
+				if (!serializer.Open(virtualFile, FileMode.READ))
+				{
+					if (serializer.Read(virtualStorage))
+					{
+						bool hasItems = virtualStorage.storedItems.Count() > 0;
+						container.VSM_SetHasItems(hasItems);
+					}
+				}
+			}
 		}
 	}
 
@@ -93,14 +108,14 @@ class VirtualStorageModule : CF_ModuleWorld
 
 	void OnSaveVirtualStore(ItemBase container)
 	{
-		if (!GetGame().IsServer() || !container.VSM_IsLoaded())
+		Log("OnSaveVirtualStore", container.GetType()+ "INIT loaded="+container.VSM_IsLoaded()+" canvirtualize="+container.VSM_CanVirtualize() + " processing=" + container.VSM_IsProcessing());
+		if (!GetGame().IsServer() || !container.VSM_IsLoaded() || !container.VSM_CanVirtualize()|| container.VSM_IsProcessing())
 			return;
 
-		Log("OnSaveVirtualStore", container.GetType());
+		container.VSM_SetIsProcessing(true);
 
 		string virtualPath = GetVirtualContextDirectory(container);
-		if (!FileExist(virtualPath))
-			MakeDirectory(virtualPath);
+		if (!FileExist(virtualPath)) MakeDirectory(virtualPath);
 
 		string virtualFile = GetVirtualFile(container);
 
@@ -145,6 +160,8 @@ class VirtualStorageModule : CF_ModuleWorld
 		if (!serializer.Open(virtualFile, FileMode.WRITE))
 		{
 			Error("OnSaveVirtualStore", "Não foi possível abrir o arquivo virtual para escrever:" + virtualFile);
+			container.VSM_SetIsProcessing(false);
+
 			return;
 		}
 
@@ -156,10 +173,12 @@ class VirtualStorageModule : CF_ModuleWorld
 		}
 		else
 		{
+			container.VSM_SetIsProcessing(false);
 			Error("OnSaveVirtualStore", "Não foi possível escrever o arquivo de virtualização" + container.GetType() + " file=" + virtualFile);
 		}
 
 		serializer.Close();
+		container.VSM_SetIsProcessing(false);
 		Log("OnSaveVirtualStore", "terminado" + container.GetType());
 	}
 
@@ -186,17 +205,21 @@ class VirtualStorageModule : CF_ModuleWorld
 		if (!GetGame().IsServer())
 			return;
 
-		Log("OnLoadVirtualStore", " init" + container.GetType() + " LOADED=" + container.VSM_IsLoaded() + " HASITEMS=" + container.VSM_HasVirtualItems() + " RESTORING" + container.VSM_IsRestoring());
+		Log("OnLoadVirtualStore", " init " + container.GetType() + " LOADED=" + container.VSM_IsLoaded() + " HASITEMS=" + container.VSM_HasVirtualItems() + " PROCESSING=" + container.VSM_IsProcessing());
 
-		if (!container.VSM_IsLoaded() || !container.VSM_HasVirtualItems() && !container.VSM_CanVirtualize() || container.VSM_IsRestoring())
+		if (!container.VSM_IsLoaded() || !container.VSM_HasVirtualItems() && !container.VSM_CanVirtualize() || container.VSM_IsProcessing())
 			return;
 
+		container.VSM_SetIsProcessing(true);
 		Log("OnLoadVirtualStore", container.GetType());
 
 		string virtualPath = GetVirtualContextDirectory(container);
 		if (!FileExist(virtualPath))
 		{
 			Error("OnLoadVirtualStore", "A pasta virtual não existe " + virtualPath);
+			container.VSM_SetHasItems(false);
+			container.VSM_SetIsProcessing(false);
+
 			return;
 		}
 
@@ -204,6 +227,9 @@ class VirtualStorageModule : CF_ModuleWorld
 		if (!FileExist(virtualFile))
 		{
 			Error("OnLoadVirtualStore", "O arquivo virtual não existe" + virtualFile);
+			container.VSM_SetHasItems(false);
+			container.VSM_SetIsProcessing(false);
+
 			return;
 		}
 
@@ -213,6 +239,7 @@ class VirtualStorageModule : CF_ModuleWorld
 		if (!serializer.Open(virtualFile, FileMode.READ))
 		{
 			Error("OnLoadVirtualStore", "Não foi possível abrir o arquivo virtual" + virtualFile);
+			container.VSM_SetIsProcessing(false);
 			return;
 		}
 
@@ -227,6 +254,8 @@ class VirtualStorageModule : CF_ModuleWorld
 		else
 		{
 			Error("OnLoadVirtualStore", container.GetType() + " não foi possível ler o arquivo virtual " + virtualFile);
+			container.VSM_SetIsProcessing(false);
+
 		}
 		serializer.Close();
 		Log("OnLoadVirtualStore ", container.GetType() + " terminated ");
@@ -248,9 +277,8 @@ class VirtualStorageModule : CF_ModuleWorld
 		foreach (ItemBase container : m_InitContainers) {
 			OnProcessContainerInit(container);
 		}
+		m_InitContainers.Clear();
 	}
-
-
 
 	string GetPersistentId(ItemBase container)
 	{
@@ -284,7 +312,6 @@ class VirtualStorageModule : CF_ModuleWorld
 	{
 		m_ActiveRestorations.RemoveItem(queue);
 	}
-
 
 	void Log(string method, string msg)
 	{
