@@ -1,129 +1,89 @@
-class VSM_RestorationQueue
+class VSM_RestorationQueue extends BatchQueue_Base
 {
-    protected bool m_Debug;
-    protected int m_TickInterval;
-    protected int m_BatchSize;
-    protected int m_CurrentIdx;
-    protected string m_VirtualContextDirectory;
+    protected bool m_ForceSpawnOnGround;
+    protected ref array<ref VirtualObjectContext> m_Items;
+    protected ref array<ItemBase> m_SpawnedItems;
 
-    protected ItemBase m_Container;
-    ref array<ref VirtualObject> m_Items;
+    protected ref array<ref VirtualObject> m_ProcessedItems;
 
-    void VSM_RestorationQueue(ItemBase container, array<ref VirtualObject> items)
+    void OnInit( array<ref VirtualObjectContext> items)
     {
-        m_TickInterval = CfgGameplayHandler.GetVSM_BatchInterval() * 1000;
-        m_BatchSize = CfgGameplayHandler.GetVSM_BatchSize();
-        m_Container = container;
+        Print("VSM_RestorationQueue item:" + items);
         m_Items = items;
-        m_CurrentIdx = 0;
-        m_VirtualContextDirectory = VirtualStorageModule.GetModule().GetVirtualContextDirectory(m_Container);
-        m_Debug = VirtualStorageModule.GetModule().m_Debug;
+        m_ItemCount = m_Items.Count();
+        m_ForceSpawnOnGround = false;
+        m_SpawnedItems = new array<ItemBase>;
+        super.OnInit(); //debug
+
+        m_Metadata.SetLastOperationState(VirtualStorageState.RESTORING);
     }
 
-    void ~VSM_RestorationQueue()
+    override void OnStart()
     {
-        Print("handle destruido");
+        super.OnStart();
+        m_Container.VSM_OnBeforeContainerRestore(); //prepare
     }
 
-    void OnInit()
+    override void OnTick(int idx)
     {
-        if (m_Debug)
+        VirtualObjectContext item = m_Items.Get(idx);
+        string virtualFile = m_VirtualContextDirectory + item.contextFile;
+        if (!FileExist(virtualFile))
         {
-            Print("VSM_RestorationQueue: iniciando -----");
-            Print(m_TickInterval);
-            Print(m_BatchSize);
-            Print(m_Container);
-            Print(m_Items);
-            Print(m_CurrentIdx);
-            Print(m_VirtualContextDirectory);
-            Print("-------------------------------------");
-        }
-    }
-
-    void OnStart() { 
-         if (m_Debug)
-            Print("OnStart " + m_Container.GetType());
-    }
-
-    void OnTick()
-    {
-         
-        if (!m_Container && !m_Container.IsAlive())
-        {
-            Stop();
+            VSM_Error("OnTick", "O arquivo virtual não existe " + virtualFile);
             return;
         }
 
-        int endIdx = Math.Min(m_CurrentIdx + m_BatchSize, m_Items.Count());
-        
-        if (m_Debug)
-            Print("OnTick " + m_Container.GetType() + " m_CurrentIdx="+m_CurrentIdx+" endIdx="+endIdx);
-
-
-        for (int i = m_CurrentIdx; i < endIdx; i++)
+        FileSerializer ctx = new FileSerializer();
+		VirtualStorageFile virtualStorage = new VirtualStorageFile();
+        if (!ctx.Open(virtualFile, FileMode.READ))
         {
-            VirtualObject item = m_Items.Get(i);
-            if (m_Debug)
-					Print("OnTick " + m_Container.GetType() + " restoring " + item.m_Classname);
-            item.OnRestore(m_VirtualContextDirectory, m_Container);
+            VSM_Error("OnTick", "Não foi possível abrir o arquivo virtual" + virtualFile);
+            return;
         }
 
-        m_CurrentIdx = endIdx;
+        VirtualObject obj = new VirtualObject(m_VirtualContextDirectory, m_Container);
+        ItemBase restored = obj.OnRestore(ctx, m_ForceSpawnOnGround);
 
-        if (m_CurrentIdx >= m_Items.Count())
-        {
-            if (m_Debug)
-                Print("OnTick " + m_Container.GetType() + " PARANDO m_CurrentIdx="+m_CurrentIdx+" endIdx="+endIdx);
-            
-            Stop();
-            OnComplete();
-        }
+        if(restored)
+            m_SpawnedItems.Insert(restored);
     }
 
-    void OnStop()
+    override void OnComplete()
     {
-        VirtualStorageModule.GetModule().RemoveActiveRestoration(this);
-        m_Container.VSM_OnAfterContainerRestore();
-		m_Container.VSM_SetIsProcessing(false);
-
-        if (m_Debug)
-            Print("VSM_RestorationQueue " + m_Container.GetType() + " carregamento parado");
-    }
-
-    void OnComplete()
-    {
+        super.OnComplete();
         m_Container.VSM_OnAfterContainerRestore();
         m_Container.VSM_SetHasItems(false);
-		m_Container.VSM_SetIsProcessing(false);
+        m_Container.VSM_SetIsProcessing(false);
+        m_Metadata.SetLastOperationState(VirtualStorageState.RESTORED);
 
-        if (m_Debug)
-            Print("VSM_RestorationQueue " + m_Container.GetType() + " carregamento concluído");
-    }
-
-    void Start()
-    {
-        if (m_Debug)
-            Print("Start " + m_Container.GetType());
-
-        if (!m_Items || m_Items.Count() == 0)
-        {
-            OnComplete();
-            return;
+        foreach (VirtualObject obj : m_ProcessedItems) {
+            if (obj) obj.OnRestoreComplete();
         }
-        OnStart();
-        OnTick(); // tick inicial
-        GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(this.OnTick, m_TickInterval, true);
     }
 
-    void Stop()
+    override void OnRollback()
     {
-        if (m_Debug)
-            Print("Stop " + m_Container.GetType());
-            
-        OnStop();
-        GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).Remove(this.OnTick);
+        m_Container.VSM_SetIsProcessing(true);
+        foreach (ItemBase item : m_SpawnedItems) {
+			if(item)
+                item.Delete();
+		}
+        m_Container.VSM_Close();
+        m_Container.VSM_SetIsProcessing(false);
+        m_Metadata.SetLastOperationState(VirtualStorageState.VIRTUALIZED);
+    }
+    
+    override void OnRestart()
+    {
+        ClearInventory();
+        m_Container.VSM_Open();
     }
 
-    
-
+    override void OnSync()
+    {
+        m_Container.VSM_SetIsProcessing(true);
+        m_Container.VSM_Open();
+        m_Container.VSM_SetIsProcessing(false);
+    }
 }

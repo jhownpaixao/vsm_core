@@ -1,4 +1,4 @@
-class VirtualObject
+class VirtualObject_Legacy
 {
     string m_Classname;
     string m_Type;
@@ -14,20 +14,20 @@ class VirtualObject
     int m_Quantity = 0;
     int m_LiquidType = 0;
     float m_Health;
-    ref array<ref VirtualObject> m_Children = { };
+    ref array<ref VirtualObject_Legacy> m_Children = { };
 
     //handlers
-    ref VSM_AmmunitionHandler m_AmmoHandler;
-    ref VSM_MagazineHandler m_MagazineHandler;
-    ref VSM_WeaponHander m_WeaponHandler;
-    ref VSM_StoreHandler m_StoreHandler;
+    ref VSM_AmmunitionHandler_Legacy m_AmmoHandler;
+    ref VSM_MagazineHandler_Legacy m_MagazineHandler;
+    ref VSM_WeaponHander_Legacy m_WeaponHandler;
+    ref VSM_StoreHandler_Legacy m_StoreHandler;
 
     void RegisterObjectHandler()
     {
-        m_AmmoHandler = new VSM_AmmunitionHandler();
-        m_MagazineHandler = new VSM_MagazineHandler();
-        m_WeaponHandler = new VSM_WeaponHander();
-        m_StoreHandler = new VSM_StoreHandler();
+        m_AmmoHandler = new VSM_AmmunitionHandler_Legacy();
+        m_MagazineHandler = new VSM_MagazineHandler_Legacy();
+        m_WeaponHandler = new VSM_WeaponHander_Legacy();
+        m_StoreHandler = new VSM_StoreHandler_Legacy();
 
         if (VirtualStorageModule.GetModule().m_Debug)
             Print("RegisterObjectHandler: " + m_Classname);
@@ -185,7 +185,7 @@ class VirtualObject
             if (VirtualStorageModule.GetModule().m_Debug)
                 Print("OnRestore: " + m_Classname + " starting spawn children");
 
-            foreach (VirtualObject childObj : m_Children) {
+            foreach (VirtualObject_Legacy childObj : m_Children) {
                 if (VirtualStorageModule.GetModule().m_Debug)
                     Print("OnRestore: " + m_Classname + " restoring child " + childObj.m_Classname);
                 childObj.OnRestore(virtualPath, restoredObject);
@@ -276,7 +276,7 @@ class VirtualObject
                 if (VirtualStorageModule.GetModule().m_Debug)
                     Print("VirtualizeChildren: " + item.GetType() + " saving " + child.GetType());
 
-                VirtualObject childObj = new VirtualObject();
+                VirtualObject_Legacy childObj = new VirtualObject_Legacy();
                 childObj.OnVirtualize(virtualPath, child, item);
                 m_Children.Insert(childObj);
             }

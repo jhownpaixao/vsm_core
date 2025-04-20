@@ -27,7 +27,7 @@ modded class CfgGameplayHandler
 		return m_Data.VSMData.autoCloseInterval;
 	} 
 	//----------------------------------------------------------------------------------
-	static int GetVSM_AutoClosePlayerDistance()
+	static float GetVSM_AutoClosePlayerDistance()
 	{
 		return m_Data.VSMData.autoClosePlayerDistance;
 	} 

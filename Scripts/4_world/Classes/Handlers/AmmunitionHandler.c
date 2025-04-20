@@ -1,37 +1,35 @@
 class VSM_AmmunitionHandler extends VirtualObjectHandler_Base
 {
-    bool m_IsAmmo;
     int m_Quantity;
 
     override bool CanHandler(ItemBase item)
     {
-        
-        if (VirtualStorageModule.GetModule().m_Debug)
-        Print("VSM_AmmunitionHandler CanHandler=" + item.GetType());
-
         Ammunition_Base ammo = Ammunition_Base.Cast(item);
-        if (ammo && ammo.IsAmmoPile())
-            return true;
-        
-        return false;
-    }
-    
-    
-    override void OnVirtualize(string virtualPath, ItemBase virtualize, ItemBase parent) 
-    {
-        
-        Ammunition_Base ammo = Ammunition_Base.Cast(virtualize);
-        m_IsAmmo = true;
-        m_Quantity = ammo.GetAmmoCount();
-        if (VirtualStorageModule.GetModule().m_Debug)
-        Print("VSM_AmmunitionHandler virtualizando quantity="+m_Quantity);
+        return ammo && ammo.IsAmmoPile();
     }
 
-    override void OnRestore(string virtualPath, ItemBase restored, ItemBase parent) 
+    override bool OnStoreLoad(ParamsReadContext ctx, int version) 
+    {
+        if (!ctx.Read(m_Quantity)) return false;
+
+        return true;
+    }
+
+    override void OnStoreSave(ParamsWriteContext ctx) 
+    {
+        ctx.Write(m_Quantity);
+    }
+
+    override void OnVirtualize(ItemBase virtualize, ItemBase parent) 
+    {
+        Ammunition_Base ammo = Ammunition_Base.Cast(virtualize);
+        m_Quantity = ammo.GetAmmoCount();
+    }
+
+    override bool OnRestore(ItemBase restored, ItemBase parent) 
     {
         Ammunition_Base ammo = Ammunition_Base.Cast(restored);
         ammo.ServerSetAmmoCount(m_Quantity);
-        if (VirtualStorageModule.GetModule().m_Debug)
-        Print("VSM_AmmunitionHandler restaurando quantity="+m_Quantity);
+        return true;
     }
 }

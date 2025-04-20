@@ -9,21 +9,58 @@ modded class ItemBase
         m_VSM_HasVirtualItems = false;
         m_VSM_VirtualStorageLoaded = false;
         RegisterNetSyncVariableBool("m_VSM_HasVirtualItems");
+        RegisterNetSyncVariableBool("m_VSM_ProcessingItems");
+        RegisterNetSyncVariableBool("m_VSM_VirtualStorageLoaded");
+    }
+
+
+    override bool CanReceiveItemIntoCargo(EntityAI item)
+    {
+        if (VSM_IsProcessing())
+            return false;
+
+        return super.CanReceiveItemIntoCargo(item);
     }
 
     override bool CanReleaseCargo(EntityAI cargo)
     {
-        if (VSM_IsProcessing() || VSM_IsOpen())
+        if (VSM_IsProcessing())
             return false;
 
         return super.CanReleaseCargo(cargo);
     }
 
-    override bool CanDisplayCargo()
+    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
     {
-        if (VSM_IsProcessing() || VSM_IsOpen())
+        if (VSM_IsProcessing())
             return false;
 
+        return super.CanReceiveAttachment(attachment, slotId);
+    }
+
+    override bool CanReleaseAttachment( EntityAI attachment )
+    {
+        if (VSM_IsProcessing())
+            return false;
+
+        return super.CanReleaseAttachment(attachment);
+    }
+
+    override bool CanDisplayAttachmentSlot(int slot_id)
+    {
+         if (VSM_IsProcessing())
+            return false;
+        
+         return super.CanDisplayAttachmentSlot(slot_id);
+    }
+
+    override bool CanDisplayCargo()
+    {
+        if (VSM_IsProcessing())
+        {
+            return false; 
+        }
+           
         return super.CanDisplayCargo();
     }
 
@@ -35,13 +72,16 @@ modded class ItemBase
         return super.CanPutInCargo(parent);
     }
 
-    override bool CanReceiveItemIntoCargo(EntityAI item)
-    {
-        if (VSM_IsProcessing() || VSM_IsOpen())
-            return false;
+    override bool CanDisplayAttachmentCategory( string category_name )
+	{
+        if (VSM_IsProcessing())
+        {
+            return false; 
+        }
 
-        return super.CanReceiveItemIntoCargo(item);
-    }
+        return super.CanDisplayAttachmentCategory(category_name);
+	}
+
 
     bool VSM_CanAutoClose()
     {
@@ -71,6 +111,7 @@ modded class ItemBase
     void VSM_SetVirtualLoaded(bool loaded)
     {
         m_VSM_VirtualStorageLoaded = loaded;
+        SetSynchDirty();
     }
 
     bool VSM_IsProcessing()
@@ -81,6 +122,7 @@ modded class ItemBase
     void VSM_SetIsProcessing(bool processing)
     {
         m_VSM_ProcessingItems = processing;
+        SetSynchDirty();
     }
 
     // pode ser virtualizado?
@@ -88,20 +130,13 @@ modded class ItemBase
     {
         bool includeDecayItems = CfgGameplayHandler.GetVSM_IncludeDecayItems();
         if (!includeDecayItems && CanDecay())
-        {
-            if (VirtualStorageModule.GetModule().m_Debug)
-                Print("VSM_CanVirtualize ignorado: " + GetType() + " CanDecay");
             return false;
-        }
+        
 
         ref TStringArray ignoredItems = CfgGameplayHandler.GetVSM_IgnoredItems();
         if (ignoredItems.Find(GetType()) > -1)
-        {
-            if (VirtualStorageModule.GetModule().m_Debug)
-                Print("VSM_CanVirtualize ignorado: " + GetType() + " ignoredItems");
             return false;
-        }
-
+    
         return true;
     }
 
@@ -174,6 +209,12 @@ modded class ItemBase
     // antes dos itens serem restaurados
     void VSM_OnAfterRestoreChildren() { }
 
+    // antes da virtualização dos filhos
+    void VSM_OnBeforeVirtualizeChildren() { }
+
+    // após a virtualização dos filhos
+    void VSM_OnAfterVirtualizeChildren() { }
+
     // após o item ser restaurado
     void VSM_OnAfterRestore()
     {
@@ -229,9 +270,6 @@ modded class ItemBase
         VSM_StopAutoClose();
 
         int timeToClose = CfgGameplayHandler.GetVSM_AutoCloseInterval() * 1000;
-        if (VirtualStorageModule.GetModule().m_Debug)
-            Print("Starting auto close: " + GetType() + " for seconds:" + timeToClose);
-
         GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).CallLater(this.VSM_OnAutoClose, timeToClose, false, false);
     }
 
@@ -244,17 +282,13 @@ modded class ItemBase
     void VSM_OnAutoClose()
     {
         bool ignorePlayersNearby = CfgGameplayHandler.GetVSM_AutoCloseIgnorePlayerNearby();
-        float playerDistance = CfgGameplayHandler.GetVSM_AutoCloseIgnorePlayerNearby();
+        float playerDistance = CfgGameplayHandler.GetVSM_AutoClosePlayerDistance();
 
         if (!ignorePlayersNearby && VirtualUtils.IsPlayerNearby(GetPosition(), playerDistance))
         {
-            if (VirtualStorageModule.GetModule().m_Debug)
-                Print("VSM_OnAutoClose: " + GetType() + " ignorando, players proximos");
-
             VSM_StartAutoClose();
             return;
         }
-
 
         VSM_Close();
     }

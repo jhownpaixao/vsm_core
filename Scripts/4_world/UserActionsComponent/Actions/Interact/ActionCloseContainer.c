@@ -15,7 +15,7 @@ class ActionVSM_Close: ActionInteractBase
 			ItemBase container = ItemBase.Cast( target_object );
 			if( container )
 			{			
-				if ( container.VSM_IsOpen() )
+				if ( container.VSM_IsOpen() && !container.VSM_IsProcessing() && !container.IsDamageDestroyed() )
 				{
 					return true;
 				}

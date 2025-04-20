@@ -1,73 +1,73 @@
 class VSM_StoreHandler extends VirtualObjectHandler_Base
 {
     string m_ContextId;
+    int m_GameSaveVersion; //! não é o mesmo que o VSM_Version
 
-    override void OnVirtualize(string virtualPath, ItemBase virtualize, ItemBase parent) {
+    override bool OnStoreLoad(ParamsReadContext ctx, int version) 
+    {
+        if (!ctx.Read(m_ContextId)) return false;
+        if (!ctx.Read(m_GameSaveVersion)) return false;
 
-        if (VirtualStorageModule.GetModule().m_Debug)
-        Print("VSM_StoreHandler: OnVirtualize " + virtualize.GetType() + "salvando contextoId=" + m_ContextId);
-        
-        if (!virtualize)
-            return;
-
-        FileSerializer ctx = new FileSerializer();
-        m_ContextId = VirtualStorageModule.GetModule().GetPersistentId(virtualize);
-        string virtualFile = m_ContextId + ".bin";
-        string filename = virtualPath + virtualFile;
-
-        if (ctx.Open(filename, FileMode.WRITE))
-        {
-            virtualize.VSM_OnVirtualStoreSave(ctx);
-            if (VirtualStorageModule.GetModule().m_Debug)
-            Print("VSM_StoreHandler: OnVirtualize " + virtualize.GetType() + " salvando arquivo de contexto m_ContextId=" + m_ContextId);
-
-        }
-        else
-        {
-            if (VirtualStorageModule.GetModule().m_Debug)
-                Print("Não foi possível abrir o arquivo de contexto: " + filename);
-        }
-
-        ctx.Close();
-        Print("VSM_StoreHandler: OnVirtualize " + virtualize.GetType() + " salvamento concluído");
-
+        return true;
     }
 
-    override void OnRestore(string virtualPath, ItemBase restored, ItemBase parent) 
+    override void OnStoreSave(ParamsWriteContext ctx) 
     {
+        ctx.Write(m_ContextId);
+        ctx.Write(m_GameSaveVersion);
+    }
+
+    override void OnVirtualize(ItemBase virtualize, ItemBase parent)
+    {
+        VSM_Debug("OnVirtualize ", "%1 iniciando virtualização de contexto",virtualize.GetType());
+        
+        m_ContextId = VirtualStorageModule.GetModule().GetPersistentId(virtualize);
+        m_GameSaveVersion = GetGame().SaveVersion();
+        string filename = GetCtxFileName();
+
+        if(FileExist(filename))
+            DeleteFile(filename);
+        
         FileSerializer ctx = new FileSerializer();
-        string virtualFile = m_ContextId + ".bin";
-        string filename = virtualPath + virtualFile;
+        if (!ctx.Open(filename, FileMode.WRITE))
+        {
+           VSM_Debug("Não foi possível abrir o arquivo de contexto", filename);
+           return;
+        }
 
-        if (VirtualStorageModule.GetModule().m_Debug)
-        Print("VSM_StoreHandler: OnRestore " + restored.GetType() + " iniciando restauração, m_ContextId=" + m_ContextId + " filename " + filename );
+        virtualize.VSM_OnVirtualStoreSave(ctx);
+        ctx.Close();
 
+        VSM_Debug("OnVirtualize ","%1 salvamento concluído, id: %2",  virtualize.GetType(), m_ContextId);
+    }
+
+    override bool OnRestore(ItemBase restored, ItemBase parent) 
+    {
+        VSM_Debug("OnRestore", "%1 iniciando restauração, m_ContextId: %2",restored.GetType(), m_ContextId);
+        
+        string filename = GetCtxFileName();
+        FileSerializer ctx = new FileSerializer();
         if (!ctx.Open(filename, FileMode.READ))
         {
-            if (VirtualStorageModule.GetModule().m_Debug)
-                Print("Não foi possível abrir o arquivo de contexto: " + filename);
-            return;
+            VSM_Error("OnRestore", "Não foi possível abrir o arquivo de contexto: " + filename);
+            return false;
         }
 
-        // bool success = restored.VSM_OnVirtualStoreLoad(ctx, GAME_STORAGE_VERSION);
-        if(restored.VSM_OnVirtualStoreLoad(ctx, 9999))
-        {
-            if (VirtualStorageModule.GetModule().m_Debug)
-            Print("VSM_StoreHandler: OnRestore " + restored.GetType() + " leitura concluida");
-        }
-        else
-        {
-            if (VirtualStorageModule.GetModule().m_Debug)
-            Print("VSM_StoreHandler: OnRestore " + restored.GetType() + " falha na restauração...");
-        }
+        //TODO: preciso estudar mais sobre o versionamento do store vanilla. O 999 funciona com a maior parte dos itens.
+        if(!restored.VSM_OnVirtualStoreLoad(ctx, m_GameSaveVersion))
+            VSM_Debug("OnRestore","%1 falha na restauração do contexto,id: %1 | vesão: %3", restored.GetType(), m_ContextId, m_GameSaveVersion.ToString());
         
+        restored.VSM_AfterVirtualStoreLoad();
 
         ctx.Close();
 
         DeleteFile(filename);
-        if (VirtualStorageModule.GetModule().m_Debug)
-        Print("VSM_StoreHandler: OnRestore " + restored.GetType() + " terminada");
-
+        VSM_Debug("OnRestore", restored.GetType() + " terminada");
+        return true;
     }
 
+    string GetCtxFileName()
+    {
+        return m_VirtualPath + "0ctx_" + m_ContextId + ".bin";
+    }
 }
