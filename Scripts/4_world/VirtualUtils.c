@@ -17,7 +17,6 @@ class VirtualUtils
 				continue;
 			if (!FileExist(path) && !MakeDirectory(path))
 			{
-				// Print("Não foi possível criar o diretório "+ path);
 				return false;
 			}
 		}
@@ -33,7 +32,9 @@ class VirtualUtils
             foreach (string baseName: files)
             {
                 if (!DeleteFile(path + baseName))
-                    // Print("[EntityStorage] couldn't delete " + path + baseName);
+				{
+					Print("[EntityStorage] couldn't delete " + path + baseName);
+				}
             }
 
             if (!DeleteFile(path))
@@ -121,13 +122,11 @@ class VirtualUtils
 
 	static bool IsPlayerNearby(vector position, float radius)
 	{
-		// Print("IsPlayerNearby");
 		array<Object> objects = {};
 		GetGame().GetObjectsAtPosition(position, radius, objects, NULL);
 
 		foreach (Object obj : objects)
 		{
-			// Print("IsPlayerNearby verificando "+ obj);
 			PlayerBase player = PlayerBase.Cast(obj);
 			if (player && player.IsAlive())
 			{
@@ -185,32 +184,38 @@ class VirtualUtils
 	//TODO: porque não usar o CF_LOG ?
 	static void Trace(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
+		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.TRACE) return;
 		PrintFormat("[TRACE] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Debug(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
+		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.DEBUG) return;
 		PrintFormat("[DEBUG] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Info(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
+		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.INFO) return;
 		PrintFormat("[INFO] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Warn(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
+		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.WARN) return;
 		PrintFormat("[WARNING] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Error(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
+		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.ERROR) return;
 		PrintFormat("[ERROR] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 		LogStack();
 	}
 
 	static void Critical(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
+		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.CRITICAL) return;
 		PrintFormat("[CRITICAL] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 		LogStack();
 	}

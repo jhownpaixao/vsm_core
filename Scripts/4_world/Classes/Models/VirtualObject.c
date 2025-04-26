@@ -3,8 +3,7 @@ class VirtualObject : VSM_Base
     //!v100 não alterar
     int m_Version;
 
-    /* Caracteristicas */
-    // v100 @{
+    //* V_2504
     string m_Classname;
     string m_Type;
 
@@ -18,82 +17,40 @@ class VirtualObject : VSM_Base
     int m_Quantity;
 
     ref array<ref VirtualObjectContext> m_Children = { };
-    // v100 @}
 
     /* Operacional */
     protected string m_VirtualContextDirectory;
     protected ItemBase m_Parent;
     protected ref array<ref VirtualObjectHandler_Base> m_Handlers = { };
+    protected ref array<string> m_FilesToDelete; // arquivos a serem deletados após o processamento
+    protected ref array<ref VirtualObject> m_ProcessedItems; // itens processados
 
     void VirtualObject(string virtualPath, ItemBase parent)
     {
         m_VirtualContextDirectory = virtualPath;
         m_Parent = parent;
-        m_Version = VSM_STORAGE_VERSION; //! força para última versão
+        m_Version = VSM_StorageVersion.CURRENT_VERSION; //! força para última versão
+        m_ProcessedItems = new array<ref VirtualObject>;
+        m_FilesToDelete = new array<string>;
     }
 
     bool OnStoreLoad(ParamsReadContext ctx)
     {
-        if (!ctx.Read(m_Version))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler a versão do arquivo virtual");
-            return false;
-        }
+        if (!ctx.Read(m_Version)) return false;
 
-        if (!ctx.Read(m_Classname))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível m_Classname");
-            return false;
-        }
-        if (!ctx.Read(m_Type))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível m_Type");
-            return false;
-        }
+        if (!ctx.Read(m_Classname)) return false;
+        if (!ctx.Read(m_Type)) return false;
 
-        if (!ctx.Read(m_InvRow))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler m_InvRow");
-            return false;
-        }
-        if (!ctx.Read(m_InvCol))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler m_InvCol");
-            return false;
-        }
-        if (!ctx.Read(m_InvType))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler m_InvType");
-            return false;
-        }
-        if (!ctx.Read(m_InvIdX))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler m_InvIdX");
-            return false;
-        }
-        if (!ctx.Read(m_InvSlotId))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler m_InvSlotId");
-            return false;
-        }
-        if (!ctx.Read(m_InvFliped))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler m_InvFliped");
-            return false;
-        }
+        if (!ctx.Read(m_InvRow)) return false;
+        if (!ctx.Read(m_InvCol)) return false;
+        if (!ctx.Read(m_InvType)) return false;
+        if (!ctx.Read(m_InvIdX)) return false;
+        if (!ctx.Read(m_InvSlotId)) return false;
+        if (!ctx.Read(m_InvFliped)) return false;
 
-        if (!ctx.Read(m_Quantity))
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível m_Quantity");
-            return false;
-        }
+        if (!ctx.Read(m_Quantity)) return false;
 
-
-        if (!ctx.Read(m_Children)) 
-        {
-            VSM_Warn("OnStoreLoad", "não foi possível ler m_Children");
-            return false;
-        };
+        if (!ctx.Read(m_Children))  return false;
 
         return true;
     }
@@ -115,11 +72,11 @@ class VirtualObject : VSM_Base
         ctx.Write(m_Quantity);
 
         ctx.Write(m_Children);
-
     }
 
     void OnRegisterObjectHandler()
     {   
+        //* V_2504
         m_Handlers.Insert(new VSM_HealthHandler(m_VirtualContextDirectory));
         m_Handlers.Insert(new VSM_AmmunitionHandler(m_VirtualContextDirectory));
         m_Handlers.Insert(new VSM_MagazineHandler(m_VirtualContextDirectory));
@@ -133,14 +90,14 @@ class VirtualObject : VSM_Base
 
         if (!OnStoreLoad(ctx))
         {
-            VSM_Error("OnRestore", " Não é foi possível ler o contexto do item.");
+            VSM_Warn("OnRestore", " Não foi possível ler o contexto do item.");
             return restoredObject;
         }
 
-        VSM_Info("OnRestore", "%1 iniciando. VERSÃO %3", m_Classname, m_Version.ToString());
+        VSM_Debug("OnRestore", "%1 iniciando. VERSÃO %2", m_Classname, m_Version.ToString());
         OnRegisterObjectHandler();
 
-
+        VSM_Trace("OnRestore", "%1 grounded: %2, m_InvType: %3, m_InvIdX: %4, m_InvRow: %5, m_InvCol: %6, m_InvFliped: %7", m_Classname, grounded.ToString(), m_InvType.ToString(), m_InvIdX.ToString(), m_InvRow.ToString(), m_InvCol.ToString(), m_InvFliped.ToString());
         if (!grounded)
         {
             switch (m_InvType)
@@ -162,39 +119,6 @@ class VirtualObject : VSM_Base
         
         if (!restoredObject)
             restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
-
-
-        // if (grounded)
-        // {
-        //     VSM_Debug("OnRestore", m_Classname + " forçar spawn no chão");
-        //     restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
-        // }
-        // else if (m_InvSlotId != -1)
-        // {
-        //     VSM_Debug("OnRestore", m_Classname + " spawn no slot");
-        //     restoredObject = SpawnItemOnSlot(m_Classname, m_Parent, m_InvSlotId);
-        // }
-        // else
-        // {
-        //     GameInventory parentInv = GameInventory.Cast(m_Parent.GetInventory());
-        //     if (!parentInv)
-        //     {
-        //         VSM_Error("OnRestore", m_Classname + " não foi possível spawnar o item: inventário inacessível");
-        //         return restoredObject;
-        //     }
-
-        //     parentInv.UnlockInventory(HIDE_INV_FROM_SCRIPT);
-        //     if (IsValidSpawnInInv())
-        //     {
-        //         VSM_Debug("OnRestore", m_Classname + " spawn no inventário");
-        //         restoredObject = SpawnItemOnCargo(m_Classname, m_Parent, m_InvIdX, m_InvRow, m_InvCol, m_InvFliped);
-        //     }
-        //     else
-        //     {
-        //         VSM_Debug("OnRestore", m_Classname + " spawn no chão");
-        //         restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
-        //     }
-        // }
 
         if (!restoredObject)
         {
@@ -239,6 +163,8 @@ class VirtualObject : VSM_Base
 
             VirtualObject obj = new VirtualObject(m_VirtualContextDirectory, parent);
             ItemBase restored = obj.OnRestore(ctx);
+            m_ProcessedItems.Insert(obj);
+            m_FilesToDelete.Insert(virtualFile);
         } 
         parent.VSM_OnAfterRestoreChildren();      
     }
@@ -246,8 +172,6 @@ class VirtualObject : VSM_Base
     void OnVirtualize(ParamsWriteContext ctx, ItemBase childItem)
     {
         m_Classname = childItem.GetType();
-        VSM_Info("OnVirtualize", m_Classname + " iniciando virtualização | VERSÃO %1", m_Version.ToString());
-
         InventoryLocation invLocation = new InventoryLocation();
         childItem.GetInventory().GetCurrentInventoryLocation(invLocation);
 
@@ -277,7 +201,7 @@ class VirtualObject : VSM_Base
 
     void VirtualizeChildren(ItemBase parent)
     {
-        VSM_Info("VirtualizeChildren", parent.GetType() + " init");
+        VSM_Debug("VirtualizeChildren", parent.GetType() + " init");
         parent.VSM_OnBeforeVirtualizeChildren();
         array<EntityAI> items = new array<EntityAI>;
         parent.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, items);
@@ -324,6 +248,7 @@ class VirtualObject : VSM_Base
 
     ItemBase SpawnItemOnGround(string classname, vector pos)
     {
+        VSM_Trace("SpawnItemOnGround", "classname: %1, pos: %2", classname, pos.ToString());
         ItemBase item = ItemBase.Cast(GetGame().CreateObject(m_Classname, pos, false, false, true));
         return item;
     }
@@ -331,6 +256,10 @@ class VirtualObject : VSM_Base
     ItemBase SpawnItemOnSlot(string classname, ItemBase container, int slotId)
     {
         ItemBase item;
+
+        VSM_Trace("SpawnItemOnSlot", "classname: %1, container: %2, slotId: %3", classname, container.GetType(), slotId.ToString());
+        container.GetInventory().SetSlotLock(slotId, false);
+
         if (container.IsWeapon() && GetGame().IsKindOf(classname, "Magazine"))
         {
             Weapon_Base weapon = Weapon_Base.Cast(container);
@@ -338,13 +267,30 @@ class VirtualObject : VSM_Base
         }
         else
         {
-            item = ItemBase.Cast(container.GetInventory().CreateAttachmentEx(classname, slotId));
+            InventoryLocation location = new InventoryLocation();
+            EntityAI attachedItem = container.GetInventory().FindAttachment(slotId);
+            if (!attachedItem)
+            {
+                location.SetAttachment(container, null, slotId);
+                item = ItemBase.Cast(GameInventory.LocationCreateEntity(location, classname, ECE_IN_INVENTORY, RF_DEFAULT));
+            }
+            else if(attachedItem.GetType() == classname)
+            {
+                item = ItemBase.Cast(attachedItem);
+            }
+            else
+            {
+                VSM_Debug("SpawnItemOnSlot", "Item já existe no slot: " + classname + " " + attachedItem.GetType() + " " + slotId.ToString());
+            }
+
+            // item = ItemBase.Cast(container.GetInventory().CreateAttachmentEx(classname, slotId));
         }
         return item;
     }
 
     ItemBase SpawnItemOnCargo(string classname, ItemBase container, int idx, int row, int col, bool isFliped)
     {
+        VSM_Trace("SpawnItemOnCargo", "classname: %1, container: %2, idx: %3, row: %4, col: %5, isFliped: %6", classname, container.GetType(), idx.ToString(), row.ToString(), col.ToString(), isFliped.ToString());
         GameInventory parentInv = GameInventory.Cast(container.GetInventory());
         ItemBase item = ItemBase.Cast(parentInv.CreateEntityInCargoEx(classname, idx, row, col, isFliped));
         return item;
@@ -371,6 +317,23 @@ class VirtualObject : VSM_Base
         {
             handler.OnRestoreComplete();
         }
+
+        foreach (VirtualObject obj : m_ProcessedItems) {
+            if (obj) obj.OnRestoreComplete();
+        }
+
+        VSM_Debug("OnComplete", "Iniciando delete de arquivos" + m_FilesToDelete.Count());
+        foreach (string file : m_FilesToDelete) {
+            if (FileExist(file)) {
+                DeleteFile(file);
+                VSM_Debug("OnComplete", "Arquivo de contexto deletado: " + file);
+            }
+            else 
+            {
+                VSM_Debug("OnComplete", "Arquivo de contexto não existe: " + file);
+            }
+        }
+
     }
 
     void OnVirtualizeComplete()

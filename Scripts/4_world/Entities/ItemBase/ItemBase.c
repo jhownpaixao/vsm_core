@@ -1,7 +1,7 @@
 modded class ItemBase
 {
     protected bool m_VSM_HasVirtualItems; // verifica se existem item no virtual
-    protected bool m_VSM_ProcessingItems;
+    protected bool m_VSM_ProcessingItems; // utilizado para travar o container
     protected bool m_VSM_VirtualStorageLoaded;
 
     void ItemBase()
@@ -30,10 +30,12 @@ modded class ItemBase
         return super.CanReleaseCargo(cargo);
     }
 
-    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
+    override bool CanReceiveAttachment(EntityAI attachment, int slotId) //impede o proprio container de restaurar os itens
     {
-        if (VSM_IsProcessing())
-            return false;
+        //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
+        //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
+        /* if (VSM_IsProcessing())
+            return false; */
 
         return super.CanReceiveAttachment(attachment, slotId);
     }
@@ -132,9 +134,7 @@ modded class ItemBase
         if (!includeDecayItems && CanDecay())
             return false;
         
-
-        ref TStringArray ignoredItems = CfgGameplayHandler.GetVSM_IgnoredItems();
-        if (ignoredItems.Find(GetType()) > -1)
+        if(VirtualStorageModule.GetModule().IsIgnoredItem(GetType()))
             return false;
     
         return true;
@@ -291,5 +291,16 @@ modded class ItemBase
         }
 
         VSM_Close();
+    }
+
+    bool VSM_CanManipule()
+    {
+        if (VSM_IsProcessing())
+            return false;
+
+        if (!VSM_IsOpen())
+            return false;
+
+        return true;
     }
 }

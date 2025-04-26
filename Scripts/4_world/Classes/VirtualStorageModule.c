@@ -2,13 +2,9 @@
 [CF_RegisterModule(VirtualStorageModule)]
 class VirtualStorageModule : CF_ModuleWorld
 {
-	static const string METADATA_FILENAME = "meta.json";
-	static const string VIRTUAL_FILENAME = "main.bin";
-
 	protected static VirtualStorageModule sm_Instance;
 	static ref map<string, ref BatchQueue_Base> m_ActiveQueues = new map<string, ref BatchQueue_Base>();
 
-	bool m_Debug;
 	bool m_IsLoaded;
 	bool m_IsMissionFinishing;
 
@@ -27,15 +23,13 @@ class VirtualStorageModule : CF_ModuleWorld
 		EnableMissionStart();
 		EnableMissionLoaded();
 		EnableMissionFinish();
-		VSM_Info("OnInit", "invoke");
 	}
 
 	override void OnMissionStart(Class sender, CF_EventArgs args)
 	{
 		super.OnMissionStart(sender, args);
+		VSM_Info("OnMissionStart", "Iniciando VirtualStorageModule");
 
-
-		m_Debug = CfgGameplayHandler.GetVSM_EnableDebug();
 		bool autoClose = CfgGameplayHandler.GetVSM_AutoCloseEnable();
 		int autoCloseInterval = CfgGameplayHandler.GetVSM_AutoCloseInterval();
 		float playerDistance = CfgGameplayHandler.GetVSM_AutoClosePlayerDistance();
@@ -46,16 +40,15 @@ class VirtualStorageModule : CF_ModuleWorld
 		TStringArray ignoreItems = CfgGameplayHandler.GetVSM_IgnoredItems();
 
 		VSM_Debug("OnMissionStart", "Definindo variaveis");
-		VSM_Debug("OnMissionStart", "debug: %1",m_Debug.ToString());
-		VSM_Debug("OnMissionStart",	"autoclose: %1", autoClose.ToString());
-		VSM_Debug("OnMissionStart",	"autoclose player distance: %1", playerDistance.ToString());
-		VSM_Debug("OnMissionStart",	"autoclose interval: %1", autoCloseInterval.ToString());
-		VSM_Debug("OnMissionStart",	"autoclose ignorenearby: %1", ignoreNearby.ToString());
-		VSM_Debug("OnMissionStart",	"batch size: %1", batchSize.ToString());
-		VSM_Debug("OnMissionStart",	"batch interval: %1", batchInterval.ToString());
-		VSM_Debug("OnMissionStart",	"include decay: %1", includeDecayItems.ToString());
-		VSM_Debug("OnMissionStart",	"ignore itens: %1 items", ignoreItems.Count().ToString());
-		VSM_Debug("OnMissionStart","------------------------------------------------");
+		VSM_Debug("OnMissionStart", "autoclose: %1", autoClose.ToString());
+		VSM_Debug("OnMissionStart", "autoclose player distance: %1", playerDistance.ToString());
+		VSM_Debug("OnMissionStart", "autoclose interval: %1", autoCloseInterval.ToString());
+		VSM_Debug("OnMissionStart", "autoclose ignorenearby: %1", ignoreNearby.ToString());
+		VSM_Debug("OnMissionStart", "batch size: %1", batchSize.ToString());
+		VSM_Debug("OnMissionStart", "batch interval: %1", batchInterval.ToString());
+		VSM_Debug("OnMissionStart", "include decay: %1", includeDecayItems.ToString());
+		VSM_Debug("OnMissionStart", "ignore itens: %1 items", ignoreItems.Count().ToString());
+		VSM_Debug("OnMissionStart", "------------------------------------------------");
 
 		if (!FileExist(GetVirtualDirectory()))
 			VirtualUtils.MakeDirectoryRecursive(GetVirtualDirectory());
@@ -64,29 +57,23 @@ class VirtualStorageModule : CF_ModuleWorld
 	override void OnMissionLoaded(Class sender, CF_EventArgs args)
 	{
 		super.OnMissionLoaded(sender, args);
-
-		VSM_Info("OnMissionLoaded", " missão carregada");
-
 		m_IsLoaded = true;
 		ProcessContainersInit();
 	}
 
 	override void OnMissionFinish(Class sender, CF_EventArgs args)
 	{
-		m_IsMissionFinishing = true;
-		VSM_Info("OnMissionFinish", " Iniciando auto close");
 		super.OnMissionFinish(sender, args);
 
-		Print("OnMissionFinish ITEMS COUNT " + m_InitContainers.Count());
+		VSM_Info("OnMissionFinish", " Iniciando processo de fechamento dos containers virtuais");
+		m_IsMissionFinishing = true;
+
 		foreach (ItemBase container : m_InitContainers) {
-			if (container.VSM_CanVirtualize())
+
+			if (container && container.VSM_CanVirtualize() && container.VSM_IsOpen())
 			{
-				VSM_Info("OnMissionFinish", container.GetType() + " analisando o container");
-				if (container.VSM_IsOpen())
-				{
-					VSM_Info("OnMissionFinish", container.GetType() + " container aberto, fechando...");
-					container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
-				}
+				VSM_Debug("OnMissionFinish", container.GetType() + " container aberto, fechando...");
+				container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
 			}
 		}
 	}
@@ -105,21 +92,15 @@ class VirtualStorageModule : CF_ModuleWorld
 		}
 
 		string virtualFile = GetVirtualFile(container);
-		container.VSM_SetVirtualLoaded(true);
-
-		//! storage novo
+		
+		// storage é novo, não tem arquivo virtual
 		if (!FileExist(virtualFile))
 		{
-			VSM_Warn("OnProcessContainerInit", container.GetType() + " storage sem arquivo virtual, forçando virtualização");
+			container.VSM_SetVirtualLoaded(true);
 			if (container.VSM_IsOpen())
-			{
-				VSM_Info("OnProcessContainerInit", container.GetType() + " container aberto, fechando...");
 				container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
-			}
 			else
-			{
 				OnSaveVirtualStore(container); //! testar para servidores novos (onde os storages ainda não foram virutalizados);
-			}
 		}
 		else
 		{
@@ -128,43 +109,18 @@ class VirtualStorageModule : CF_ModuleWorld
 			VirtualMetadata metadata = new VirtualMetadata(VirtualStorageModule.GetModule().GetVirtualMetadataFile(container));
 			metadata.OnInit();
 
-			FileSerializer ctx = new FileSerializer();
-			VirtualStorageFile virtualStorage = new VirtualStorageFile();
-
-			if (!ctx.Open(virtualFile, FileMode.READ))
-			{
-				VSM_Warn("OnProcessContainerInit", "Não foi possível abrir o arquivo virtual" + virtualFile);
-				container.VSM_SetIsProcessing(false);
-				container.VSM_SetHasItems(false);
-				ctx.Close();
-				return;
-			}
-
-			if (!ctx.Read(virtualStorage)){
-				VSM_Warn("OnProcessContainerInit", container.GetType() + " não foi possível ler o arquivo virtual " + virtualFile);
-				ctx.Close();
-				return;
-			}
-
-			VSM_Debug("OnProcessContainerInit", container.GetType() + " iniciando verificação do metadata");
-
 			if (!metadata.IsNew())
 			{
-				VSM_Debug("OnProcessContainerInit", container.GetType() + " arquivo de metadata detectado");
+
 				if (metadata.IsRestoring() || metadata.IsRestored())
 				{
-					VSM_Debug("OnProcessContainerInit", container.GetType() + " container em processo de restauração: reiniciando fila...");
-					
-					container.VSM_OnBeforeContainerRestore();
 					VSM_RestorationQueue restoreQueue = new VSM_RestorationQueue(container);
 					m_ActiveQueues.Insert(container.VSM_GetId(), restoreQueue);
 
-					restoreQueue.OnInit(virtualStorage.storedItems);
-
 					if (metadata.IsRestoring())
 					{
+						VSM_Warn("OnProcessContainerInit", container.GetType() + " container em processo de restauração: reiniciando fila...");
 						restoreQueue.OnRestart();
-						restoreQueue.Start();
 					}
 					else if (metadata.IsRestored())
 					{
@@ -173,73 +129,51 @@ class VirtualStorageModule : CF_ModuleWorld
 				}
 				else if (metadata.IsVirtualizing() || metadata.IsVirtualized())
 				{
-					VSM_Debug("OnProcessContainerInit", container.GetType() + " container em processo de virtualização: reiniciando fila...");
 					container.VSM_OnBeforeContainerRestore();
 					VSM_VirtualizeQueue virtualizeQueue = new VSM_VirtualizeQueue(container);
 					m_ActiveQueues.Insert(container.VSM_GetId(), virtualizeQueue);
 
-					array<EntityAI> items = new array<EntityAI>;
-					container.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, items);
-					virtualizeQueue.OnInit(items);
-
 					if (metadata.IsVirtualizing())
 					{
+						VSM_Warn("OnProcessContainerInit", container.GetType() + " container em processo de virtualização: reiniciando fila...");
 						virtualizeQueue.OnRestart();
-						virtualizeQueue.Start();
 					}
 					else if (metadata.IsVirtualized())
 					{
 						virtualizeQueue.OnSync();
 					}
-
 				}
 			}
-			else
-			{
-				VSM_Debug("OnProcessContainerInit", container.GetType() + " metadata novo");
-			}
-			ctx.Close();
-		}
 
-		if (container.VSM_IsOpen())
-		{
-			VSM_Info("OnProcessContainerInit", container.GetType() + " container aberto, fechando...");
-			container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
+			container.VSM_SetVirtualLoaded(true);
+			if (container.VSM_IsOpen())
+				container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
 		}
-		
-		
-		VSM_Info("OnProcessContainerInit", container.GetType() + " inicialização concluída");
 	}
 
 	void OnInitContainer(ItemBase container)
 	{
+		m_InitContainers.Insert(container);
+
 		if (m_IsLoaded)
 			OnProcessContainerInit(container);
-		else
-			m_InitContainers.Insert(container);
 	}
 
 	void OnSaveVirtualStore(ItemBase container)
 	{
-		VSM_Info("OnSaveVirtualStore", container.GetType() + " Init: loaded=" + container.VSM_IsLoaded() + " canvirtualize=" + container.VSM_CanVirtualize() + " processing=" + container.VSM_IsProcessing());
+		VSM_Debug("OnSaveVirtualStore", container.GetType() + " Init: loaded=" + container.VSM_IsLoaded() + " canvirtualize=" + container.VSM_CanVirtualize() + " processing=" + container.VSM_IsProcessing());
 		if (!GetGame().IsServer() || container.IsDamageDestroyed() || !container.VSM_IsLoaded() || !container.VSM_CanVirtualize() || container.VSM_IsProcessing() || HasActiveQueue(container))
 			return;
 
-		container.VSM_SetIsProcessing(true);
-
+		
 		string virtualPath = GetVirtualContextDirectory(container);
 		if (!FileExist(virtualPath)) MakeDirectory(virtualPath);
 
-		VSM_Info("OnSaveVirtualStore", container.GetType() + " preparing to save");
-
-		container.VSM_OnBeforeContainerVirtualize(); // prepare
-
-		array<EntityAI> items = new array<EntityAI>;
-		container.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, items);
+		VSM_Debug("OnSaveVirtualStore", container.GetType() + " preparing to save");
 
 		VSM_VirtualizeQueue queue = new VSM_VirtualizeQueue(container);
 		m_ActiveQueues.Insert(container.VSM_GetId(), queue);
-		queue.OnInit(items);
+
 		queue.Start();
 	}
 
@@ -253,53 +187,20 @@ class VirtualStorageModule : CF_ModuleWorld
 		if (!container.VSM_IsLoaded() || !container.VSM_HasVirtualItems() && !container.VSM_CanVirtualize() || container.VSM_IsProcessing() || HasActiveQueue(container))
 			return;
 
-		container.VSM_SetIsProcessing(true);
 
-		string virtualPath = GetVirtualContextDirectory(container);
-		if (!FileExist(virtualPath))
-		{
-			VSM_Error("OnLoadVirtualStore", "A pasta virtual não existe " + virtualPath);
-			container.VSM_SetHasItems(false);
-			container.VSM_SetIsProcessing(false);
-
-			return;
-		}
 
 		string virtualFile = GetVirtualFile(container);
 		if (!FileExist(virtualFile))
 		{
-			VSM_Error("OnLoadVirtualStore", "O arquivo virtual não existe" + virtualFile);
+			VSM_Warn("OnLoadVirtualStore", container.GetType() + " Não foi possível encontrar o arquivo virtual " + virtualFile);
 			container.VSM_SetHasItems(false);
-			container.VSM_SetIsProcessing(false);
-
 			return;
 		}
-
-		FileSerializer serializer = new FileSerializer();
-		VirtualStorageFile virtualStorage = new VirtualStorageFile();
-
-		if (!serializer.Open(virtualFile, FileMode.READ))
-		{
-			VSM_Error("OnLoadVirtualStore", "Não foi possível abrir o arquivo virtual" + virtualFile);
-			container.VSM_SetIsProcessing(false);
-			return;
-		}
-
-		if (serializer.Read(virtualStorage))
-		{
-			VSM_RestorationQueue queue = new VSM_RestorationQueue(container);
-			m_ActiveQueues.Insert(container.VSM_GetId(), queue);
-			queue.OnInit(virtualStorage.storedItems);
-			queue.Start();
-		}
-		else
-		{
-			VSM_Error("OnLoadVirtualStore", container.GetType() + " não foi possível ler o arquivo virtual " + virtualFile);
-			container.VSM_SetIsProcessing(false);
-
-		}
-		serializer.Close();
-		VSM_Info("OnLoadVirtualStore ", container.GetType() + " concluído");
+	
+		VSM_RestorationQueue queue = new VSM_RestorationQueue(container);
+		m_ActiveQueues.Insert(container.VSM_GetId(), queue);
+		queue.Start();
+		
 	}
 
 	void OnDeleteContainer(ItemBase container)
@@ -323,46 +224,16 @@ class VirtualStorageModule : CF_ModuleWorld
 		if (!container.VSM_IsLoaded() || !container.VSM_HasVirtualItems() && !container.VSM_CanVirtualize())
 			return;
 
-		container.VSM_SetIsProcessing(true);
-
-		string virtualPath = GetVirtualContextDirectory(container);
-		if (!FileExist(virtualPath))
-		{
-			VSM_Error("OnDestroyed", "A pasta virtual não existe " + virtualPath);
-			return;
-		}
-
 		string virtualFile = GetVirtualFile(container);
 		if (!FileExist(virtualFile))
 		{
-			VSM_Error("OnDestroyed", "O arquivo virtual não existe" + virtualFile);
+			VSM_Debug("OnDestroyed", container.GetType() + " Não foi possível localizar o virtual storage deste item" + virtualFile);
 			return;
 		}
-
-		FileSerializer serializer = new FileSerializer();
-		VirtualStorageFile virtualStorage = new VirtualStorageFile();
-
-		if (!serializer.Open(virtualFile, FileMode.READ))
-		{
-			VSM_Error("OnDestroyed", "Não foi possível abrir o arquivo virtual" + virtualFile);
-			container.VSM_SetIsProcessing(false);
-			return;
-		}
-
-		if (serializer.Read(virtualStorage))
-		{
-			container.VSM_OnBeforeContainerRestore(); //prepare
-			VSM_DropQueue queue = new VSM_DropQueue(container);
-			m_ActiveQueues.Insert(container.VSM_GetId(), queue);
-			queue.OnInit(virtualStorage.storedItems);
-			queue.Start();
-		}
-		else
-		{
-			VSM_Error("OnDestroyed", container.GetType() + " não foi possível ler o arquivo virtual " + virtualFile);
-		}
-		serializer.Close();
-		VSM_Info("OnDestroyed ", container.GetType() + " concluído");
+		
+		VSM_DropQueue queue = new VSM_DropQueue(container);
+		m_ActiveQueues.Insert(container.VSM_GetId(), queue);
+		queue.Start();	
 	}
 
 	void ProcessContainersInit()
@@ -393,12 +264,12 @@ class VirtualStorageModule : CF_ModuleWorld
 
 	string GetVirtualFile(ItemBase container)
 	{
-		return GetVirtualContextDirectory(container) + VIRTUAL_FILENAME;
+		return GetVirtualContextDirectory(container) + VSM_Constants.VIRTUAL_FILENAME;
 	}
 
 	string GetVirtualMetadataFile(ItemBase container)
 	{
-		return GetVirtualFile(container) + "." + METADATA_FILENAME;
+		return GetVirtualFile(container) + "." + VSM_Constants.METADATA_FILENAME;
 	}
 
 	static VirtualStorageModule GetModule()
@@ -415,6 +286,21 @@ class VirtualStorageModule : CF_ModuleWorld
 	{
 		VSM_Debug("HasActiveQueue", "? %1", m_ActiveQueues.Contains(container.VSM_GetId()).ToString());
 		return m_ActiveQueues.Contains(container.VSM_GetId());
+	}
+
+	bool IsIgnoredItem(string itemType)
+	{
+		ref TStringArray ignoredItems = CfgGameplayHandler.GetVSM_IgnoredItems();
+		if (ignoredItems.Find(itemType) > -1) return true;
+
+		if (CfgGameplayHandler.GetVSM_UseCfgIgnoreList())
+		{
+			VSM_CfgIgnoreList cfgIgnoreList = new VSM_CfgIgnoreList();
+			ref TStringArray cfgIgnoredItems = cfgIgnoreList.GetList();
+			if (ignoredItems.Find(itemType) > -1) return true;
+		}
+
+		return false;
 	}
 
 	//!log

@@ -12,9 +12,9 @@ modded class CfgGameplayHandler
 	//========================
 
 	//----------------------------------------------------------------------------------
-	static bool GetVSM_EnableDebug()
+	static VSM_LogLevel GetVSM_LogLevel()
 	{
-		return m_Data.VSMData.enableDebug;
+		return m_Data.VSMData.logLevel;
 	}
 	//----------------------------------------------------------------------------------
 	static bool GetVSM_AutoCloseEnable()
@@ -57,5 +57,9 @@ modded class CfgGameplayHandler
 		return m_Data.VSMData.ignoredItems;
 	} 
 	//----------------------------------------------------------------------------------
-
+	static bool GetVSM_UseCfgIgnoreList()
+	{
+		return m_Data.VSMData.useCfgIgnoreList;
+	} 
+	//----------------------------------------------------------------------------------
 }

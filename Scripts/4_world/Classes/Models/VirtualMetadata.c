@@ -80,7 +80,7 @@ class VirtualMetadata : VSM_Base
     int GetVersion()
     {
         if(!m_Version)
-            m_Version = VSM_STORAGE_COMPATIBILITY_VERSION;
+            m_Version = VSM_StorageVersion.COMPATIBILITY_VERSION;
         
         return m_Version;
     }

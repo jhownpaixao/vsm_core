@@ -1,6 +1,5 @@
 class BatchQueue_Base : VSM_Base
 {
-    protected bool m_Debug;
     protected int m_TickInterval;
     protected int m_BatchSize;
     protected int m_CurrentIdx;
@@ -17,28 +16,15 @@ class BatchQueue_Base : VSM_Base
         m_Container = container;
         m_CurrentIdx = 0;
         m_VirtualContextDirectory = VirtualStorageModule.GetModule().GetVirtualContextDirectory(m_Container);
-        m_Debug = VirtualStorageModule.GetModule().m_Debug;
         m_VirtualFilePath = VirtualStorageModule.GetModule().GetVirtualFile(container);
         m_Metadata = new VirtualMetadata(VirtualStorageModule.GetModule().GetVirtualMetadataFile(container));
     }
 
-    void OnInit()
+    bool OnInit()
     {
         VSM_Debug("OnInit", m_Container.GetType() + " proceso iniciado");
-
-        if (m_Debug)
-        {
-            Print("BatchQueue_Base: iniciando -----");
-            Print(m_TickInterval);
-            Print(m_BatchSize);
-            Print(m_Container);
-            Print(m_ItemCount);
-            Print(m_CurrentIdx);
-            Print(m_VirtualContextDirectory);
-            Print("-------------------------------------");
-        }
-
         m_Metadata.OnInit();
+        return true;
     }
 
     void OnStart() { }
@@ -54,9 +40,9 @@ class BatchQueue_Base : VSM_Base
 
     void OnComplete()
     {
-        VirtualStorageModule.GetModule().RemoveActiveQueue(m_Container);
         VSM_Debug("OnComplete", m_Container.GetType() + " proceso completado");
         m_Metadata.Save();
+        VirtualStorageModule.GetModule().RemoveActiveQueue(m_Container);
     }
 
     void OnCancel() { }
@@ -99,12 +85,17 @@ class BatchQueue_Base : VSM_Base
 
     void Start()
     {
-        if (m_ItemCount == 0)
+        if(!OnInit())
+            return;
+
+        OnStart();
+
+
+        /* if (m_ItemCount == 0)
         {
             OnComplete();
             return;
-        }
-        OnStart();
+        } */
         Tick(); // tick inicial
         GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(this.Tick, m_TickInterval, true);
     }
@@ -141,7 +132,9 @@ class BatchQueue_Base : VSM_Base
         }
     }
 
-    protected void SaveMetaData()
+    protected void SaveMetaData() { }
+
+    protected bool CanStart()
     {
 
     }

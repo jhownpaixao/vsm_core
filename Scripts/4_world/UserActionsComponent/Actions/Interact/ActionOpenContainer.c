@@ -32,7 +32,7 @@ class ActionVSM_Open: ActionInteractBase
 		{
 			container.VSM_Open();
 			
-			container.StartItemSoundServer(SoundConstants.ITEM_TENT_WINDOW_OPEN);
+			// container.StartItemSoundServer(SoundConstants.ITEM_TENT_WINDOW_OPEN);
 		}
 	}
 };

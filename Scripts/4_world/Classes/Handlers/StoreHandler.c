@@ -66,6 +66,18 @@ class VSM_StoreHandler extends VirtualObjectHandler_Base
         return true;
     }
 
+    override void OnRestoreComplete() 
+    {
+        VSM_Debug("OnRestoreComplete","finalizando restauração, m_ContextId: %2", m_ContextId);
+        
+        string filename = GetCtxFileName();
+        if (FileExist(filename))
+        {
+            DeleteFile(filename);
+            VSM_Debug("OnRestoreComplete", "Arquivo de contexto deletado: " + filename);
+        }
+    }
+
     string GetCtxFileName()
     {
         return m_VirtualPath + "0ctx_" + m_ContextId + ".bin";
