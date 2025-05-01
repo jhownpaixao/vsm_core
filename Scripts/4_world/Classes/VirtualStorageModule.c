@@ -8,6 +8,8 @@ class VirtualStorageModule : CF_ModuleWorld
 	bool m_IsLoaded;
 	bool m_IsMissionFinishing;
 
+	int m_MissionStorageId;
+
 	ref array<ItemBase> m_InitContainers = new array<ItemBase>;
 
 	void VirtualStorageModule()
@@ -29,6 +31,8 @@ class VirtualStorageModule : CF_ModuleWorld
 	{
 		super.OnMissionStart(sender, args);
 		VSM_Info("OnMissionStart", "Iniciando VirtualStorageModule");
+
+		m_MissionStorageId = GetGame().ServerConfigGetInt("instanceId");
 
 		bool autoClose = CfgGameplayHandler.GetVSM_AutoCloseEnable();
 		int autoCloseInterval = CfgGameplayHandler.GetVSM_AutoCloseInterval();
@@ -63,8 +67,7 @@ class VirtualStorageModule : CF_ModuleWorld
 
 	override void OnMissionFinish(Class sender, CF_EventArgs args)
 	{
-		super.OnMissionFinish(sender, args);
-
+	
 		VSM_Info("OnMissionFinish", " Iniciando processo de fechamento dos containers virtuais");
 		m_IsMissionFinishing = true;
 
@@ -76,6 +79,8 @@ class VirtualStorageModule : CF_ModuleWorld
 				container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
 			}
 		}
+
+		super.OnMissionFinish(sender, args);
 	}
 #endif
 
@@ -98,9 +103,15 @@ class VirtualStorageModule : CF_ModuleWorld
 		{
 			container.VSM_SetVirtualLoaded(true);
 			if (container.VSM_IsOpen())
+			{
+				VSM_Debug("OnProcessContainerInit","NOVO - Fechando container inicial " + container.GetType());
 				container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
+			}
 			else
+			{
+				VSM_Debug("OnProcessContainerInit","NOVO - Container fechado, salvando..." + container.GetType());
 				OnSaveVirtualStore(container); //! testar para servidores novos (onde os storages ainda não foram virutalizados);
+			}
 		}
 		else
 		{
@@ -147,7 +158,7 @@ class VirtualStorageModule : CF_ModuleWorld
 
 			container.VSM_SetVirtualLoaded(true);
 			if (container.VSM_IsOpen())
-				container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
+				container.VSM_Close();
 		}
 	}
 
@@ -251,8 +262,7 @@ class VirtualStorageModule : CF_ModuleWorld
 
 	string GetVirtualDirectory()
 	{
-		int instanceId = GetGame().ServerConfigGetInt("instanceId");
-		string currentStorage = "storage_" + instanceId;
+		string currentStorage = "storage_" + m_MissionStorageId;
 		return "$mission:" + currentStorage + "\\virtual\\";
 	}
 

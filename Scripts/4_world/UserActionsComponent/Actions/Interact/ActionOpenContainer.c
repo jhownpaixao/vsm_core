@@ -30,9 +30,12 @@ class ActionVSM_Open: ActionInteractBase
 		ItemBase container = ItemBase.Cast( target_object );
 		if( container )
 		{
+			if (!container.VSM_CanOpen())
+			{
+				VirtualUtils.SendMessageToPlayer(action_data.m_Player, "STR_VSM_NOT_OPEN_CONTAINER");
+				return;
+			}
 			container.VSM_Open();
-			
-			// container.StartItemSoundServer(SoundConstants.ITEM_TENT_WINDOW_OPEN);
 		}
 	}
 };

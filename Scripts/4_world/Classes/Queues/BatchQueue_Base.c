@@ -55,11 +55,12 @@ class BatchQueue_Base : VSM_Base
 
     void Tick()
     {
-        if (!m_Container && !m_Container.IsAlive())
+        if (!m_Container)
         {
             Stop();
             return;
         }
+        
         int endIdx;
 
         if (VirtualStorageModule.GetModule().m_IsMissionFinishing)
@@ -90,12 +91,6 @@ class BatchQueue_Base : VSM_Base
 
         OnStart();
 
-
-        /* if (m_ItemCount == 0)
-        {
-            OnComplete();
-            return;
-        } */
         Tick(); // tick inicial
         GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(this.Tick, m_TickInterval, true);
     }
@@ -103,7 +98,7 @@ class BatchQueue_Base : VSM_Base
     void Stop()
     {
         OnStop();
-        GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).Remove(this.OnTick);
+        GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).Remove(this.Tick);
     }
 
     void Cancel()
@@ -130,12 +125,5 @@ class BatchQueue_Base : VSM_Base
                 item.Delete();
             }
         }
-    }
-
-    protected void SaveMetaData() { }
-
-    protected bool CanStart()
-    {
-
     }
 }

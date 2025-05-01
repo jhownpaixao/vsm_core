@@ -55,6 +55,7 @@ class VSM_VirtualizeQueue extends BatchQueue_Base
 
         m_Container.VSM_SetHasItems(m_ItemCount != 1); //!fix enquanto os itens são deletados aparece a opção de "pegar na mão" para itens como barril
         m_Metadata.SetLastOperationState(VirtualStorageState.VIRTUALIZED);
+        m_Serialize.Close();
 	}
 	
     override void OnTick(int idx)

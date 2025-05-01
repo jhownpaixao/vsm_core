@@ -31,8 +31,12 @@ class ActionVSM_Close: ActionInteractBase
 		
 		if( container )
 		{
+			if (!container.VSM_CanClose())
+			{
+				VirtualUtils.SendMessageToPlayer(action_data.m_Player, "STR_VSM_NOT_CLOSE_CONTAINER");
+				return;
+			}
 			container.VSM_Close();
-			container.StartItemSoundServer(SoundConstants.ITEM_TENT_WINDOW_CLOSE);
 		}
 	}
 };

@@ -29,6 +29,7 @@ class ITEM_VSMData : ITEM_DataBase
 	ref TStringArray ignoredItems = {}; 
 	bool  useCfgIgnoreList 	= true; //! em teste
 	bool logLevel = VSM_LogLevel.ERROR;
+	bool forceSpawnOnError = false;
 };
 
 enum VSM_LogLevel

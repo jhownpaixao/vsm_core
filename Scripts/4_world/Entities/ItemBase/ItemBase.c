@@ -13,7 +13,6 @@ modded class ItemBase
         RegisterNetSyncVariableBool("m_VSM_VirtualStorageLoaded");
     }
 
-
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
         if (VSM_IsProcessing())
@@ -83,7 +82,6 @@ modded class ItemBase
 
         return super.CanDisplayAttachmentCategory(category_name);
 	}
-
 
     bool VSM_CanAutoClose()
     {
@@ -260,7 +258,6 @@ modded class ItemBase
         return false;
     }
 
-    // inicia o autoclose
     void VSM_StartAutoClose()
     {
         bool enableAutoClose = CfgGameplayHandler.GetVSM_AutoCloseEnable();
@@ -273,7 +270,6 @@ modded class ItemBase
         GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).CallLater(this.VSM_OnAutoClose, timeToClose, false, false);
     }
 
-    // para o autoclose
     void VSM_StopAutoClose()
     {
         GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).Remove(this.VSM_OnAutoClose);
@@ -302,5 +298,15 @@ modded class ItemBase
             return false;
 
         return true;
+    }
+
+    bool VSM_CanOpen()
+    {
+        return !VSM_IsProcessing() && !VSM_IsOpen();
+    }
+
+    bool VSM_CanClose()
+    {
+        return !VSM_IsProcessing() && VSM_IsOpen();
     }
 }

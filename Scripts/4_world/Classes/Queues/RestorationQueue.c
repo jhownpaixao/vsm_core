@@ -29,6 +29,8 @@ class VSM_RestorationQueue extends BatchQueue_Base
         m_FilesToDelete = new array<string>;
         m_ProcessedItems = new array<ref VirtualObject>;
 
+        serializer.Close();
+
         return super.OnInit();
     }
 
@@ -66,6 +68,8 @@ class VSM_RestorationQueue extends BatchQueue_Base
             m_SpawnedItems.Insert(restored);
 
         m_FilesToDelete.Insert(virtualFile);
+
+        ctx.Close();
     }
 
     override void OnComplete()
@@ -86,10 +90,6 @@ class VSM_RestorationQueue extends BatchQueue_Base
             if (FileExist(file)) {
                 DeleteFile(file);
                 VSM_Debug("OnComplete", "Arquivo de contexto deletado: " + file);
-            }
-            else 
-            {
-                VSM_Debug("OnComplete", "Arquivo de contexto não existe: " + file);
             }
         }
        VSM_Info("OnComplete", m_Container.GetType() + " processo de restauração de itens concluido");

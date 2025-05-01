@@ -116,9 +116,15 @@ class VirtualObject : VSM_Base
                     break;
             }
         }
-        
-        if (!restoredObject)
+        else
+        {
             restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
+        }
+        
+        //! se ja estiver no inventário ele vai duplicar aqui.
+        if (!restoredObject && CfgGameplayHandler.GetVSM_ForceSpawnOnError())
+            restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition()); 
+
 
         if (!restoredObject)
         {
@@ -165,6 +171,7 @@ class VirtualObject : VSM_Base
             ItemBase restored = obj.OnRestore(ctx);
             m_ProcessedItems.Insert(obj);
             m_FilesToDelete.Insert(virtualFile);
+            ctx.Close();
         } 
         parent.VSM_OnAfterRestoreChildren();      
     }

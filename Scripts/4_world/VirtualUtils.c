@@ -127,11 +127,12 @@ class VirtualUtils
 
 		foreach (Object obj : objects)
 		{
+			if (!obj)
+				continue;
+
 			PlayerBase player = PlayerBase.Cast(obj);
 			if (player && player.IsAlive())
-			{
 				return true;
-			}
 		}
 
 		return false;
@@ -159,6 +160,16 @@ class VirtualUtils
 		{
 			VirtualUtils.Warn("OnLocalPlayerSendMessage: Não foi possível enviar a mensagem");
 		}
+	}
+
+	static void SendMessageToPlayer(PlayerBase player, string str)
+	{
+		if(!player || !str)
+			return;
+		CF_Localiser localiser = new CF_Localiser(str);
+		string msg = localiser.Format();
+		// string msg = Widget.TranslateString("#" + str);
+		player.MessageStatus(msg);
 	}
 
 	static bool CanSendMessage(PlayerBase player)

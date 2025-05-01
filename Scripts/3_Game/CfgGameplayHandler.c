@@ -62,4 +62,9 @@ modded class CfgGameplayHandler
 		return m_Data.VSMData.useCfgIgnoreList;
 	} 
 	//----------------------------------------------------------------------------------
+	static bool GetVSM_ForceSpawnOnError()
+	{
+		return m_Data.VSMData.forceSpawnOnError;
+	} 
+	//----------------------------------------------------------------------------------
 }

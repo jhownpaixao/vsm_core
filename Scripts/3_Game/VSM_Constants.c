@@ -14,14 +14,14 @@ class VSM_Constants
     static const string METADATA_FILENAME = "meta.json";
 	static const string VIRTUAL_FILENAME = "main.bin";
 
+    bool VSM_IsNew()
+    {
+        
+        int instanceId = GetGame().ServerConfigGetInt("instanceId");
+        string currentStorage = "storage_" + instanceId;
+        string virtualPath = "$mission:" + currentStorage + "\\virtual\\";
+
+        return !FileExist(virtualPath);
+    }
 }
 
-bool VSM_IsNew()
-{
-    
-	int instanceId = GetGame().ServerConfigGetInt("instanceId");
-	string currentStorage = "storage_" + instanceId;
-	string virtualPath = "$mission:" + currentStorage + "\\virtual\\";
-
-    return !FileExist(virtualPath);
-}
