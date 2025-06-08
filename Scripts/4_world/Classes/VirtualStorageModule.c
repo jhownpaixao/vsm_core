@@ -5,6 +5,8 @@ class VirtualStorageModule : CF_ModuleWorld
 	protected static VirtualStorageModule sm_Instance;
 	static ref map<string, ref BatchQueue_Base> m_ActiveQueues = new map<string, ref BatchQueue_Base>();
 
+	bool m_IsRemoving;
+	bool m_IsNew;
 	bool m_IsLoaded;
 	bool m_IsMissionFinishing;
 
@@ -18,21 +20,50 @@ class VirtualStorageModule : CF_ModuleWorld
 		m_IsLoaded = false;
 	}
 
-#ifdef SERVER
+	bool IsNew()
+	{
+		return m_IsNew;
+	}
+
+	bool IsRemoving()
+	{
+		return m_IsRemoving;
+	}
+
+
 	override void OnInit()
 	{
 		super.OnInit();
+        EnableRPC();
+
+		#ifdef SERVER
 		EnableMissionStart();
 		EnableMissionLoaded();
 		EnableMissionFinish();
+		Metrics.OnInit();
+		#endif
 	}
 
+#ifdef SERVER
 	override void OnMissionStart(Class sender, CF_EventArgs args)
 	{
 		super.OnMissionStart(sender, args);
+
+
 		VSM_Info("OnMissionStart", "Iniciando VirtualStorageModule");
 
 		m_MissionStorageId = GetGame().ServerConfigGetInt("instanceId");
+
+		//! Jamais altere isto, pois aqui é definido se é a primeira vez que o modulo inicia
+		//! Os armazenamentos falharão no OnLoadStorage se esta verificação falhar
+		//! Isso vai gerar Script Corrupted Upon
+		//! GetVirtualDirectory() utiliza m_MissionStorageId;
+		if (!FileExist(GetVirtualDirectory()))
+		{
+			m_IsNew = true;
+		}
+
+		m_IsRemoving = CfgGameplayHandler.GetVSM_IsRemoving();
 
 		bool autoClose = CfgGameplayHandler.GetVSM_AutoCloseEnable();
 		int autoCloseInterval = CfgGameplayHandler.GetVSM_AutoCloseInterval();
@@ -42,6 +73,7 @@ class VirtualStorageModule : CF_ModuleWorld
 		int batchInterval = CfgGameplayHandler.GetVSM_BatchInterval();
 		bool includeDecayItems = CfgGameplayHandler.GetVSM_IncludeDecayItems();
 		TStringArray ignoreItems = CfgGameplayHandler.GetVSM_IgnoredItems();
+		
 
 		VSM_Debug("OnMissionStart", "Definindo variaveis");
 		VSM_Debug("OnMissionStart", "autoclose: %1", autoClose.ToString());
@@ -52,6 +84,8 @@ class VirtualStorageModule : CF_ModuleWorld
 		VSM_Debug("OnMissionStart", "batch interval: %1", batchInterval.ToString());
 		VSM_Debug("OnMissionStart", "include decay: %1", includeDecayItems.ToString());
 		VSM_Debug("OnMissionStart", "ignore itens: %1 items", ignoreItems.Count().ToString());
+		VSM_Debug("OnMissionStart", "IS NEW INSTALLATION: %1", m_IsNew.ToString());
+		VSM_Debug("OnMissionStart", "REMOVING MODULE: %1", m_IsRemoving.ToString());
 		VSM_Debug("OnMissionStart", "------------------------------------------------");
 
 		if (!FileExist(GetVirtualDirectory()))
@@ -61,6 +95,7 @@ class VirtualStorageModule : CF_ModuleWorld
 	override void OnMissionLoaded(Class sender, CF_EventArgs args)
 	{
 		super.OnMissionLoaded(sender, args);
+
 		m_IsLoaded = true;
 		ProcessContainersInit();
 	}
@@ -70,6 +105,12 @@ class VirtualStorageModule : CF_ModuleWorld
 	
 		VSM_Info("OnMissionFinish", " Iniciando processo de fechamento dos containers virtuais");
 		m_IsMissionFinishing = true;
+
+		if (FileExist(GetVirtualDirectory()) && m_IsRemoving)
+		{
+			VirtualUtils.DeleteFiles(GetVirtualDirectory());
+			return;
+		}
 
 		foreach (ItemBase container : m_InitContainers) {
 
@@ -84,6 +125,58 @@ class VirtualStorageModule : CF_ModuleWorld
 	}
 #endif
 
+	override int GetRPCMin()
+    {
+        return VSM_RPCTypes.INVALID;
+    }
+
+    override int GetRPCMax()
+    {
+        return VSM_RPCTypes.COUNT;
+    }
+
+	override void OnRPC(Class sender, CF_EventArgs args)
+    {
+        super.OnRPC(sender, args);
+        auto rpc = CF_EventRPCArgs.Cast(args);
+
+        switch (rpc.ID)
+        {
+            case VSM_RPCTypes.MENUCTX_OPEN_CONTAINER:
+                RPC_OnOpenContainer(rpc.Context, rpc.Sender, rpc.Target);
+                break;
+            case VSM_RPCTypes.MENUCTX_CLOSE_CONTAINER:
+                RPC_OnCloseContainer(rpc.Context, rpc.Sender, rpc.Target);
+                break;
+        }
+    }
+
+	void RPC_OnOpenContainer(ParamsReadContext ctx, PlayerIdentity senderRPC, Object target)
+    {
+        ItemBase container;
+		if (!ctx.Read(container)) return;
+
+		if (!container.VSM_CanOpen())
+		{
+			VirtualUtils.SendMessageToPlayer(PlayerBase.Cast(senderRPC.GetPlayer()), "STR_VSM_NOT_OPEN_CONTAINER");
+			return;
+		}
+		container.VSM_Open();
+    }
+
+	void RPC_OnCloseContainer(ParamsReadContext ctx, PlayerIdentity senderRPC, Object target)
+    {
+		ItemBase container;
+		if (!ctx.Read(container)) return;
+
+		if (!container.VSM_CanClose())
+		{
+			VirtualUtils.SendMessageToPlayer(PlayerBase.Cast(senderRPC.GetPlayer()), "STR_VSM_NOT_CLOSE_CONTAINER");
+			return;
+		}
+		container.VSM_Close();
+    }
+
 	void OnProcessContainerInit(ItemBase container)
 	{
 
@@ -94,6 +187,13 @@ class VirtualStorageModule : CF_ModuleWorld
 		{
 			container.VSM_SetVirtualLoaded(true);
 			return;
+		}
+
+		if(m_IsRemoving)
+		{
+			container.VSM_SetVirtualLoaded(true);
+			if (!container.VSM_IsOpen())
+				container.VSM_Open();
 		}
 
 		string virtualFile = GetVirtualFile(container);
@@ -165,6 +265,7 @@ class VirtualStorageModule : CF_ModuleWorld
 	void OnInitContainer(ItemBase container)
 	{
 		m_InitContainers.Insert(container);
+		container.VSM_SetIsVirtualStorage(true);
 
 		if (m_IsLoaded)
 			OnProcessContainerInit(container);
@@ -173,7 +274,7 @@ class VirtualStorageModule : CF_ModuleWorld
 	void OnSaveVirtualStore(ItemBase container)
 	{
 		VSM_Debug("OnSaveVirtualStore", container.GetType() + " Init: loaded=" + container.VSM_IsLoaded() + " canvirtualize=" + container.VSM_CanVirtualize() + " processing=" + container.VSM_IsProcessing());
-		if (!GetGame().IsServer() || container.IsDamageDestroyed() || !container.VSM_IsLoaded() || !container.VSM_CanVirtualize() || container.VSM_IsProcessing() || HasActiveQueue(container))
+		if (!GetGame().IsServer() || container.IsDamageDestroyed() || !container.VSM_IsLoaded() || !container.VSM_CanVirtualize() || container.VSM_IsProcessing() || HasActiveQueue(container) || m_IsRemoving)
 			return;
 
 		
@@ -342,5 +443,32 @@ class VirtualStorageModule : CF_ModuleWorld
 	void VSM_Critical(string mtd, string msg, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
 		VirtualUtils.Critical("VirtualStorageModule::" + mtd + " - " + msg, param1, param2, param3, param4, param5, param6, param7, param8, param9);
+	}
+
+	bool HasRegisteredVirtualContainer(ItemBase container)
+	{
+		return m_InitContainers.Find(container) > -1;
+	}
+
+	void ContextMenu_OnCloseContainer(EntityAI item)
+	{
+		ItemBase itemBase = ItemBase.Cast(item);
+		if(itemBase)
+		{
+			ScriptRPC rpc = new ScriptRPC();
+            rpc.Write(itemBase);
+            rpc.Send(NULL, VSM_RPCTypes.MENUCTX_CLOSE_CONTAINER, false, null);
+		}
+	}
+
+	void ContextMenu_OnOpenContainer(EntityAI item)
+	{
+		ItemBase itemBase = ItemBase.Cast(item);
+		if(itemBase)
+		{
+			ScriptRPC rpc = new ScriptRPC();
+            rpc.Write(itemBase);
+            rpc.Send(NULL, VSM_RPCTypes.MENUCTX_OPEN_CONTAINER, false, null);
+		}
 	}
 }

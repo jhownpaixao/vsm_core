@@ -30,6 +30,7 @@ class ITEM_VSMData : ITEM_DataBase
 	bool  useCfgIgnoreList 	= true; //! em teste
 	bool logLevel = VSM_LogLevel.ERROR;
 	bool forceSpawnOnError = false;
+	bool isRemovingModule = false;
 };
 
 enum VSM_LogLevel

@@ -7,6 +7,7 @@ class VSM_VirtualizeQueue extends BatchQueue_Base
 	protected ref CF_File m_CFVirtualFile;
 
     protected ref array<ref VirtualObject> m_ProcessedItems;
+    protected ref array<ItemBase> m_ItemsToDelete;
 
     override bool OnInit()
     {
@@ -18,6 +19,7 @@ class VSM_VirtualizeQueue extends BatchQueue_Base
         m_Serialize = new FileSerializer();
         m_VirtualStorageFile = new VirtualStorageFile();
         m_ProcessedItems = new array<ref VirtualObject>();
+        m_ItemsToDelete = new array<ItemBase>();
         //debug
 
         if (!m_Serialize.Open(m_VirtualFilePath, FileMode.WRITE))
@@ -62,7 +64,7 @@ class VSM_VirtualizeQueue extends BatchQueue_Base
     {
         ItemBase item = ItemBase.Cast(m_Items.Get(idx));
 
-        if(item && item.VSM_CanVirtualize())
+        if(item && item.VSM_CanVirtualize() && m_ItemsToDelete.Find(item) != -1)
         {
             VSM_Debug("OnAfterBatchProcess", "Excluindo %1", item.GetType());
             item.VSM_OnAfterVirtualize();
@@ -166,11 +168,6 @@ class VSM_VirtualizeQueue extends BatchQueue_Base
             string virtualFile = m_VirtualContextDirectory + fileName;
             
             VSM_Debug("OnStart(virtualizing)", "Processando item: " + item + " | virtualFile: " + virtualFile);
-
-            
-            
-            if(FileExist(virtualFile))
-                DeleteFile(virtualFile);
                   
             FileSerializer ctx = new FileSerializer();
             if (!ctx.Open(virtualFile, FileMode.WRITE))
@@ -191,6 +188,8 @@ class VSM_VirtualizeQueue extends BatchQueue_Base
             obj.virtualId = item.VSM_GetId();
             obj.contextFile = fileName;
             m_VirtualStorageFile.storedItems.Insert(obj);
+
+            m_ItemsToDelete.Insert(item);
 		}
     }
 

@@ -3,14 +3,17 @@ modded class ItemBase
     protected bool m_VSM_HasVirtualItems; // verifica se existem item no virtual
     protected bool m_VSM_ProcessingItems; // utilizado para travar o container
     protected bool m_VSM_VirtualStorageLoaded;
+    protected bool m_VSM_IsVirtualStorage;
 
     void ItemBase()
     {
         m_VSM_HasVirtualItems = false;
+        m_VSM_ProcessingItems = false;
         m_VSM_VirtualStorageLoaded = false;
         RegisterNetSyncVariableBool("m_VSM_HasVirtualItems");
         RegisterNetSyncVariableBool("m_VSM_ProcessingItems");
         RegisterNetSyncVariableBool("m_VSM_VirtualStorageLoaded");
+        RegisterNetSyncVariableBool("m_VSM_IsVirtualStorage");
     }
 
     override bool CanReceiveItemIntoCargo(EntityAI item)
@@ -83,11 +86,6 @@ modded class ItemBase
         return super.CanDisplayAttachmentCategory(category_name);
 	}
 
-    bool VSM_CanAutoClose()
-    {
-        return true;
-    }
-
     // existe itens virtuais?
     bool VSM_HasVirtualItems()
     {
@@ -123,25 +121,6 @@ modded class ItemBase
     {
         m_VSM_ProcessingItems = processing;
         SetSynchDirty();
-    }
-
-    // pode ser virtualizado?
-    bool VSM_CanVirtualize()
-    {
-        bool includeDecayItems = CfgGameplayHandler.GetVSM_IncludeDecayItems();
-        if (!includeDecayItems && CanDecay())
-            return false;
-        
-        if(VirtualStorageModule.GetModule().IsIgnoredItem(GetType()))
-            return false;
-    
-        return true;
-    }
-
-    // deletar os arquivos ao excluir este item?
-    bool VSM_CanDeleteVirtualFile()
-    {
-        return true;
     }
 
     // esta aberto ?
@@ -199,7 +178,7 @@ modded class ItemBase
     void VSM_OnBeforeVirtualize() { }
 
     // após do item ser virtualizado
-    void VSM_OnAfterVirtualize() { }
+    void VSM_OnAfterVirtualize() { } 
 
     // antes dos itens serem restaurados
     void VSM_OnBeforeRestoreChildren() { }
@@ -261,7 +240,7 @@ modded class ItemBase
     void VSM_StartAutoClose()
     {
         bool enableAutoClose = CfgGameplayHandler.GetVSM_AutoCloseEnable();
-        if (!enableAutoClose || !VSM_CanVirtualize() || !VSM_CanAutoClose() || !VSM_IsOpen())
+        if (!enableAutoClose || !VSM_CanAutoClose() || !VSM_IsOpen())
             return;
 
         VSM_StopAutoClose();
@@ -277,10 +256,12 @@ modded class ItemBase
 
     void VSM_OnAutoClose()
     {
+
         bool ignorePlayersNearby = CfgGameplayHandler.GetVSM_AutoCloseIgnorePlayerNearby();
         float playerDistance = CfgGameplayHandler.GetVSM_AutoClosePlayerDistance();
+        bool isPlayerNearby = !ignorePlayersNearby && VirtualUtils.IsPlayerNearby(GetPosition(), playerDistance);
 
-        if (!ignorePlayersNearby && VirtualUtils.IsPlayerNearby(GetPosition(), playerDistance))
+        if (!VSM_CanClose() || isPlayerNearby)
         {
             VSM_StartAutoClose();
             return;
@@ -291,22 +272,66 @@ modded class ItemBase
 
     bool VSM_CanManipule()
     {
-        if (VSM_IsProcessing())
-            return false;
+        if(VSM_CanVirtualize())
+        {
+            return !VSM_IsProcessing() && VSM_IsOpen();
+        }
 
-        if (!VSM_IsOpen())
-            return false;
+        return true;
+    }
+    
+    bool VSM_CanOpen()
+    {
+        if(VSM_CanVirtualize())
+        {
+            return !VSM_IsProcessing() && !VSM_IsOpen();
+        }
 
         return true;
     }
 
-    bool VSM_CanOpen()
-    {
-        return !VSM_IsProcessing() && !VSM_IsOpen();
-    }
-
     bool VSM_CanClose()
     {
-        return !VSM_IsProcessing() && VSM_IsOpen();
+        if(VSM_CanVirtualize())
+        {
+            return !VSM_IsProcessing() && VSM_IsOpen();
+        }
+
+        return true;
+    }
+
+    // pode ser virtualizado?
+    bool VSM_CanVirtualize()
+    {
+        bool includeDecayItems = CfgGameplayHandler.GetVSM_IncludeDecayItems();
+        if (!includeDecayItems && CanDecay())
+            return false;
+        
+        if(VirtualStorageModule.GetModule().IsIgnoredItem(GetType()))
+            return false;
+    
+        return true;
+    }
+
+    // deletar os arquivos ao excluir este item?
+    bool VSM_CanDeleteVirtualFile()
+    {
+        return true;
+    }
+
+    bool VSM_CanAutoClose()
+    {
+        return VSM_CanVirtualize();
+    }
+
+    bool VSM_IsVirtualStorage()
+    {
+        return m_VSM_IsVirtualStorage;
+    }
+
+    void VSM_SetIsVirtualStorage(bool isVirtual)
+    {
+        m_VSM_IsVirtualStorage = isVirtual;
+        SetSynchDirty();
     }
 }

@@ -67,4 +67,9 @@ modded class CfgGameplayHandler
 		return m_Data.VSMData.forceSpawnOnError;
 	} 
 	//----------------------------------------------------------------------------------
+	static bool GetVSM_IsRemoving()
+	{
+		return m_Data.VSMData.isRemovingModule;
+	} 
+	//----------------------------------------------------------------------------------
 }

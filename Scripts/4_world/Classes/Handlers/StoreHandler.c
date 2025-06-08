@@ -24,9 +24,6 @@ class VSM_StoreHandler extends VirtualObjectHandler_Base
         m_ContextId = VirtualStorageModule.GetModule().GetPersistentId(virtualize);
         m_GameSaveVersion = GetGame().SaveVersion();
         string filename = GetCtxFileName();
-
-        if(FileExist(filename))
-            DeleteFile(filename);
         
         FileSerializer ctx = new FileSerializer();
         if (!ctx.Open(filename, FileMode.WRITE))

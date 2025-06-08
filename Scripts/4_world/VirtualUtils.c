@@ -169,7 +169,9 @@ class VirtualUtils
 		CF_Localiser localiser = new CF_Localiser(str);
 		string msg = localiser.Format();
 		// string msg = Widget.TranslateString("#" + str);
-		player.MessageStatus(msg);
+		// player.MessageStatus(msg);
+		//!NÃO TESTADO
+		GetGame().RPCSingleParam(player, ERPCs.RPC_USER_ACTION_MESSAGE, new Param1<string>(msg), true, player.GetIdentity());
 	}
 
 	static bool CanSendMessage(PlayerBase player)

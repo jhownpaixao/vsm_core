@@ -11,17 +11,18 @@ class VSM_StorageVersion
 
 class VSM_Constants
 {
+    static bool m_IsNew;
+    static bool m_IsNewInitialized = false;
+
     static const string METADATA_FILENAME = "meta.json";
-	static const string VIRTUAL_FILENAME = "main.bin";
+    static const string VIRTUAL_FILENAME = "main.bin";
 
-    bool VSM_IsNew()
-    {
-        
-        int instanceId = GetGame().ServerConfigGetInt("instanceId");
-        string currentStorage = "storage_" + instanceId;
-        string virtualPath = "$mission:" + currentStorage + "\\virtual\\";
-
-        return !FileExist(virtualPath);
-    }
 }
 
+enum VSM_RPCTypes
+{
+    INVALID = 8830,
+    MENUCTX_CLOSE_CONTAINER,
+    MENUCTX_OPEN_CONTAINER,
+    COUNT
+};
