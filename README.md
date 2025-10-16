@@ -228,7 +228,7 @@ Este projeto demonstra práticas profissionais de desenvolvimento:
 
 - **Autor Principal**: iTzChronuZ (Jhonnata Paixão)
 - **Steam ID**: 76561199441861559
-- **Agradecimento Especial**: Cowboy (reempacotamento)
+- **Agradecimento Especial**: Cowboy
 
 ## 🔗 Links Importantes
 
