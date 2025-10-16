@@ -21,7 +21,7 @@ class CfgMods
 		credits = "Jhonnata Paixão";
 		author = "iTzChronuZ";
 		authorID = 76561199441861559;
-		version = "1.0.0";
+		version = "2.0.5";
 		extra = 0;
 		type = "mod";
 		dependencies[]=

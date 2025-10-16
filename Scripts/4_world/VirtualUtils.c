@@ -138,6 +138,11 @@ class VirtualUtils
 		return false;
 	}
 
+	/***
+	 * Sends a message to the local player with a cooldown to prevent spam.
+	 * !@deprecated use SendMessageToPlayer instead
+	 * @param msg The message to send.
+	 */
 	static void OnLocalPlayerSendMessage(string msg)
 	{
 		VirtualUtils.Debug("OnLocalPlayerSendMessage: enviando mensagem:: %1", msg);
@@ -166,14 +171,16 @@ class VirtualUtils
 	{
 		if(!player || !str)
 			return;
+
 		CF_Localiser localiser = new CF_Localiser(str);
 		string msg = localiser.Format();
-		// string msg = Widget.TranslateString("#" + str);
-		// player.MessageStatus(msg);
-		//!NÃO TESTADO
+		
 		GetGame().RPCSingleParam(player, ERPCs.RPC_USER_ACTION_MESSAGE, new Param1<string>(msg), true, player.GetIdentity());
 	}
 
+	/***
+	 * !@deprecated
+	 */
 	static bool CanSendMessage(PlayerBase player)
     {
         string playerId = player.GetIdentity().GetId();
@@ -197,38 +204,38 @@ class VirtualUtils
 	//TODO: porque não usar o CF_LOG ?
 	static void Trace(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
-		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.TRACE) return;
+		if(VSM_Settings.GetSettings().m_LogLevel < VSM_LogLevel.TRACE) return;
 		PrintFormat("[TRACE] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Debug(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
-		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.DEBUG) return;
+		if(VSM_Settings.GetSettings().m_LogLevel < VSM_LogLevel.DEBUG) return;
 		PrintFormat("[DEBUG] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Info(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
-		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.INFO) return;
+		if(VSM_Settings.GetSettings().m_LogLevel < VSM_LogLevel.INFO) return;
 		PrintFormat("[INFO] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Warn(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
-		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.WARN) return;
+		if(VSM_Settings.GetSettings().m_LogLevel < VSM_LogLevel.WARN) return;
 		PrintFormat("[WARNING] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 	}
 
 	static void Error(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
-		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.ERROR) return;
+		if(VSM_Settings.GetSettings().m_LogLevel < VSM_LogLevel.ERROR) return;
 		PrintFormat("[ERROR] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 		LogStack();
 	}
 
 	static void Critical(string message, string param1 = "", string param2 = "", string param3 = "", string param4 = "", string param5 = "", string param6 = "", string param7 = "", string param8 = "", string param9 = "")
 	{
-		if(CfgGameplayHandler.GetVSM_LogLevel() < VSM_LogLevel.CRITICAL) return;
+		if(VSM_Settings.GetSettings().m_LogLevel < VSM_LogLevel.CRITICAL) return;
 		PrintFormat("[CRITICAL] %1", string.Format(message, param1, param2, param3, param4, param5, param6, param7, param8, param9));
 		LogStack();
 	}

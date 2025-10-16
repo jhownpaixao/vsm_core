@@ -13,9 +13,9 @@ class ActionVSM_Close: ActionInteractBase
 		if ( target_object.IsItemBase() )
 		{
 			ItemBase container = ItemBase.Cast( target_object );
-			if( container )
+			if( container && container.VSM_IsVirtualStorage())
 			{			
-				if ( container.VSM_IsOpen() && !container.VSM_IsProcessing() && !container.IsDamageDestroyed() )
+				if (container.VSM_IsOpen() && !container.VSM_IsProcessing() && !container.IsDamageDestroyed() )
 				{
 					return true;
 				}
@@ -36,6 +36,10 @@ class ActionVSM_Close: ActionInteractBase
 				VirtualUtils.SendMessageToPlayer(action_data.m_Player, "STR_VSM_NOT_CLOSE_CONTAINER");
 				return;
 			}
+
+			VSMGameLabsIntegration gamelabs = new VSMGameLabsIntegration(action_data.m_Player, container);
+			gamelabs.ReportContainerInteraction(VSM_ReportAction.CLOSE);
+
 			container.VSM_Close();
 		}
 	}

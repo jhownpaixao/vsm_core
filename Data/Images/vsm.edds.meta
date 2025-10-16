@@ -1,0 +1,16 @@
+MetaFileClass {
+ Name "{C7207530C52772F3}vsm_core/Data/Images/vsm.edds"
+ Author "desktop-0ks153c"
+ ChangeDate -163040560
+ Configurations {
+  PNGResourceClass PC {
+   SourceFile "vsm.png"
+  }
+  PNGResourceClass XBOX_ONE : PC {
+  }
+  PNGResourceClass PS4 : PC {
+  }
+  PNGResourceClass LINUX : PC {
+  }
+ }
+}

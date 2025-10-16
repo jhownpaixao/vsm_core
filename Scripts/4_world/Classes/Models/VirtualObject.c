@@ -1,186 +1,246 @@
-class VirtualObject : VSM_Base
+typedef VSMObjectComponent TObjComponent;
+
+class VSMVirtualObject : VSMBase
 {
-    //!v100 não alterar
-    int m_Version;
-
-    //* V_2504
-    string m_Classname;
-    string m_Type;
-
-    int m_InvRow;
-    int m_InvCol;
-    int m_InvType;
-    int m_InvIdX;
-    int m_InvSlotId;
-    bool m_InvFliped;
-    
-    int m_Quantity;
-
-    ref array<ref VirtualObjectContext> m_Children = { };
+    int     m_Version;
+    string  m_Classname;
+    string  m_Type;
+    int     m_InvRow;
+    int     m_InvCol;
+    int     m_InvType;
+    int     m_InvIdX;
+    int     m_InvSlotId;
+    bool    m_InvFliped;
+    int     m_Quantity;
 
     /* Operacional */
-    protected string m_VirtualContextDirectory;
-    protected ItemBase m_Parent;
-    protected ref array<ref VirtualObjectHandler_Base> m_Handlers = { };
-    protected ref array<string> m_FilesToDelete; // arquivos a serem deletados após o processamento
-    protected ref array<ref VirtualObject> m_ProcessedItems; // itens processados
+    ref array<ref VSMMetadataItem>                  m_Children;
+    protected string                            m_VirtualContextDirectory;
+    protected ItemBase                          m_Parent;
+    protected ref array<ref TObjComponent>      m_ObjComponents;
+    protected ref array<ref VSMVirtualObject>   m_ProcessedItems; // itens processados
 
-    void VirtualObject(string virtualPath, ItemBase parent)
+    void VSMVirtualObject(string virtualPath, ItemBase parent, VSMMetadataItem vItem = null)
     {
-        m_VirtualContextDirectory = virtualPath;
-        m_Parent = parent;
-        m_Version = VSM_StorageVersion.CURRENT_VERSION; //! força para última versão
-        m_ProcessedItems = new array<ref VirtualObject>;
-        m_FilesToDelete = new array<string>;
+        m_Version                   = VSM_StorageVersion.CURRENT_VERSION; //! força para última versão
+        m_VirtualContextDirectory   = virtualPath;
+        m_Parent                    = parent;
+        m_ProcessedItems            = new array<ref VSMVirtualObject>;
+        m_ObjComponents             = new array<ref TObjComponent>;
+
+        if(vItem)
+            m_Children              = vItem.m_Children;
+        else
+            m_Children              = new array<ref VSMMetadataItem>;
     }
 
-    bool OnStoreLoad(ParamsReadContext ctx)
+    void OnRegisterObjectHandler()
+    {   
+        VSMObjectComponentConstructor constructor = new VSMObjectComponentConstructor();
+        constructor.ConstructComponents(m_Version, m_ObjComponents);
+    }
+
+    //! corrigidos erros de perda de itens
+    /**
+     * Bloco de restauração
+     */
+    ItemBase Restore(ParamsReadContext ctx, ParamsReadContext storeCtx, bool grounded = false)
     {
-        if (!ctx.Read(m_Version)) return false;
+        string header;
+        ItemBase rObj;
 
+        if (!ctx.Read(m_Version)) return null;
+        
+        VSM_Debug("Restore", "Iniciando restauração com versão: " + m_Version.ToString());
+
+        if (m_Version >= VSM_StorageVersion.V_1409)
+		{   
+            if (!ctx.Read(header))
+            {
+                VSM_Error("Restore", "Falha ao ler o cabeçalho do item - tentando liberar o contexto");
+                ReleaseCtx(ctx);
+                return null;
+            }
+
+            if (header != VSM_HeaderType.ITEM_INIT)
+			{
+				VSM_Error("Restore", "Cabeçalho inválido: " + header + " - tentando liberar o contexto");
+				ReleaseCtx(ctx);
+                return null;
+			}
+		}
+
+        //![Phase 1]: carregar o contexto deste item
+        if (!OnStoreLoad(ctx))
+        {
+            VSM_Error("Restore", "Falha ao carregar o contexto do item: " + m_Classname + " - tentando liberar o contexto");
+            
+            if (m_Version >= VSM_StorageVersion.V_1409) ReleaseCtx(ctx);
+            return null;
+        };
+
+        
+        //# spawnar item com as informações do contexto
+        rObj = OnSpawn(grounded);
+        if(!rObj)
+        {
+            VSM_Warn("Restore", "Não foi possível spawnar o item: " + m_Classname);
+            if (m_Version >= VSM_StorageVersion.V_1409) ReleaseCtx(ctx);
+            return null;
+        }
+
+        rObj.VSM_OnBeforeRestore();
+
+        //# restaurar variaveis
+        OnSetVariables(rObj);
+
+        //![Phase 2]: restaurar os items filhos
+        OnRestoreChildren(ctx, storeCtx, rObj);
+
+        //![Phase 3]: restaurar handlers
+        OnRestoreHandlers(ctx, storeCtx, rObj);
+
+        //# conclusão
+        rObj.VSM_OnAfterRestore();
+
+        if(m_Version >= VSM_StorageVersion.V_1409)
+		{
+			if (!ctx.Read(header) || header != VSM_HeaderType.ITEM_EOF) 
+			{
+				VSM_Warn("StoreLoad", "Fim de bloco inválido - tentando liberar o contexto");
+                ReleaseCtx(ctx);
+			}
+		}
+
+        VSM_Debug("Restore", m_Classname + " restaurado com sucesso, childrens: " + m_Children.Count().ToString() + ", handlers: " + m_ObjComponents.Count().ToString());
+        return rObj;
+    }
+
+    protected bool OnStoreLoad(ParamsReadContext ctx)
+    {
         if (!ctx.Read(m_Classname)) return false;
-        if (!ctx.Read(m_Type)) return false;
-
-        if (!ctx.Read(m_InvRow)) return false;
-        if (!ctx.Read(m_InvCol)) return false;
-        if (!ctx.Read(m_InvType)) return false;
-        if (!ctx.Read(m_InvIdX)) return false;
+        if (!ctx.Read(m_Type))      return false;
+        if (!ctx.Read(m_InvRow))    return false;
+        if (!ctx.Read(m_InvCol))    return false;
+        if (!ctx.Read(m_InvType))   return false;
+        if (!ctx.Read(m_InvIdX))    return false;
         if (!ctx.Read(m_InvSlotId)) return false;
         if (!ctx.Read(m_InvFliped)) return false;
-
-        if (!ctx.Read(m_Quantity)) return false;
-
-        if (!ctx.Read(m_Children))  return false;
+        if (!ctx.Read(m_Quantity))  return false;
 
         return true;
     }
 
-    void OnStoreSave(ParamsWriteContext ctx)
+    protected void OnSetVariables(ItemBase rObj)
     {
-        ctx.Write(m_Version);
+        rObj.SetQuantity(m_Quantity);
+    }
 
+    protected void OnRestoreChildren(ParamsReadContext ctx, ParamsReadContext storeCtx, ItemBase parent)
+    {
+        parent.VSM_OnBeforeRestoreChildren();
+
+        for (int i = 0; i < m_Children.Count(); i++)
+        {
+            VSMMetadataItem vItem = m_Children.Get(i);
+            VSMVirtualObject obj = new VSMVirtualObject(m_VirtualContextDirectory, parent, vItem);
+            ItemBase restored = obj.Restore(ctx, storeCtx);
+            m_ProcessedItems.Insert(obj);
+        }
+
+        parent.VSM_OnAfterRestoreChildren();      
+    }
+
+    protected void OnRestoreHandlers(ParamsReadContext ctx, ParamsReadContext storeCtx, ItemBase rObj)
+    {
+        OnRegisterObjectHandler();
+
+        for (int i = 0; i < m_ObjComponents.Count(); i++)
+        {
+            TObjComponent handler = m_ObjComponents.Get(i);
+            handler.OnBeforeRestore();
+
+            if (handler.CanHandler(rObj))
+                handler.Restore(ctx, storeCtx, m_Version, rObj);
+        } 
+    }
+
+    void OnRestoreComplete()
+    {
+		int i;
+        for (i = 0; i < m_ObjComponents.Count(); i++)
+		{
+			TObjComponent handler = m_ObjComponents[i];
+            if(!handler) continue;
+
+            handler.OnRestoreComplete();
+        }
+
+        for (i = 0; i < m_ProcessedItems.Count(); i++)
+		{
+			VSMVirtualObject obj = m_ProcessedItems[i];
+            if(!obj) continue;
+
+            obj.OnRestoreComplete();
+        }
+
+        VSM_Debug("OnComplete", m_Classname + " restaurado com sucesso, handlers: " + m_ObjComponents.Count().ToString() + ", processed: " + m_ProcessedItems.Count().ToString());
+    }
+    
+    /**
+     * Bloco de virtualização
+     */
+    VSMMetadataItem Virtualize(ParamsWriteContext ctx, ParamsWriteContext storeCtx, ItemBase item)
+    {
+        VSM_Debug("Virtualize", "Iniciando virtualização de: " + item.GetType() + " com versão: " + m_Version.ToString());
+        
+        //# preparação
+        item.VSM_OnBeforeVirtualize();
+
+        VSMMetadataItem vItem = new VSMMetadataItem();
+        OnPrepareVirtualization(vItem, item);
+
+        OnGetVariables(item);
+        ctx.Write(m_Version);
+        ctx.Write(VSM_HeaderType.ITEM_INIT);
+
+        //![Phase 1]: salvar o contexto deste item
+        OnStoreSave(ctx);
+
+        //![Phase 2]: virtualizar os filhos deste item
+        if(!OnVirtualizeChildren(ctx, storeCtx, item, vItem)) return null;
+
+        //![Phase 3]: virtualizar handlers
+        OnVirtualizeHandlers(ctx, storeCtx, item);
+
+        //# conclusão
+        item.VSM_OnAfterVirtualize();
+        ctx.Write(VSM_HeaderType.ITEM_EOF);
+
+        VSM_Debug("Virtualize", m_Classname + " virtualizado com sucesso, childrens: " + vItem.m_Children.Count().ToString());
+        return vItem;  
+    }
+
+    protected void OnStoreSave(ParamsWriteContext ctx)
+    {
         ctx.Write(m_Classname);
         ctx.Write(m_Type);
-
         ctx.Write(m_InvRow);
         ctx.Write(m_InvCol);
         ctx.Write(m_InvType);
         ctx.Write(m_InvIdX);
         ctx.Write(m_InvSlotId);
         ctx.Write(m_InvFliped);
-
         ctx.Write(m_Quantity);
-
-        ctx.Write(m_Children);
     }
 
-    void OnRegisterObjectHandler()
-    {   
-        //* V_2504
-        m_Handlers.Insert(new VSM_HealthHandler(m_VirtualContextDirectory));
-        m_Handlers.Insert(new VSM_AmmunitionHandler(m_VirtualContextDirectory));
-        m_Handlers.Insert(new VSM_MagazineHandler(m_VirtualContextDirectory));
-        m_Handlers.Insert(new VSM_WeaponHander(m_VirtualContextDirectory));
-        m_Handlers.Insert(new VSM_StoreHandler(m_VirtualContextDirectory));
-    }
-
-    ItemBase OnRestore(ParamsReadContext ctx, bool grounded = false)
+    protected void OnPrepareVirtualization(VSMMetadataItem vItem, ItemBase item)
     {
-        ItemBase restoredObject;
+        m_Classname = item.GetType();
+        vItem.m_Classname = m_Classname;
 
-        if (!OnStoreLoad(ctx))
-        {
-            VSM_Warn("OnRestore", " Não foi possível ler o contexto do item.");
-            return restoredObject;
-        }
-
-        VSM_Debug("OnRestore", "%1 iniciando. VERSÃO %2", m_Classname, m_Version.ToString());
-        OnRegisterObjectHandler();
-
-        VSM_Trace("OnRestore", "%1 grounded: %2, m_InvType: %3, m_InvIdX: %4, m_InvRow: %5, m_InvCol: %6, m_InvFliped: %7", m_Classname, grounded.ToString(), m_InvType.ToString(), m_InvIdX.ToString(), m_InvRow.ToString(), m_InvCol.ToString(), m_InvFliped.ToString());
-        if (!grounded)
-        {
-            switch (m_InvType)
-            {
-                case InventoryLocationType.ATTACHMENT:
-                    restoredObject = SpawnItemOnSlot(m_Classname, m_Parent, m_InvSlotId);
-                    break;
-
-                case InventoryLocationType.CARGO:
-                case InventoryLocationType.PROXYCARGO:
-                    restoredObject = SpawnItemOnCargo(m_Classname, m_Parent, m_InvIdX, m_InvRow, m_InvCol, m_InvFliped);
-                    break;
-
-                default:
-                    restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
-                    break;
-            }
-        }
-        else
-        {
-            restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
-        }
-        
-        //! se ja estiver no inventário ele vai duplicar aqui.
-        if (!restoredObject && CfgGameplayHandler.GetVSM_ForceSpawnOnError())
-            restoredObject = SpawnItemOnGround(m_Classname, m_Parent.GetPosition()); 
-
-
-        if (!restoredObject)
-        {
-            VSM_Warn("OnRestore", m_Classname + " item não spawnado");
-            return restoredObject;
-        }
-
-        RestoreChildren(restoredObject);
-
-        //!commons
-        restoredObject.SetQuantity(m_Quantity);
-
-        foreach (VirtualObjectHandler_Base handler : m_Handlers)
-        {
-            if (handler.CanHandler(restoredObject))
-                handler.Restore(ctx, m_Version, restoredObject, m_Parent);
-        }
-
-        restoredObject.VSM_OnAfterRestore();
-        return restoredObject;
-    }
-
-    void RestoreChildren(ItemBase parent)
-    {
-        parent.VSM_OnBeforeRestoreChildren();
-        foreach (VirtualObjectContext childObj : m_Children) {
-            string virtualFile = m_VirtualContextDirectory + childObj.contextFile;
-            
-            if (!FileExist(virtualFile))
-            {
-                VSM_Error("RestoreChildren", "O arquivo virtual não existe " + virtualFile);
-                return;
-            }
-
-            FileSerializer ctx = new FileSerializer();
-            VirtualStorageFile virtualStorage = new VirtualStorageFile();
-            if (!ctx.Open(virtualFile, FileMode.READ))
-            {
-                VSM_Error("RestoreChildren", "Não foi possível abrir o arquivo virtual" + virtualFile);
-                return;
-            }
-
-            VirtualObject obj = new VirtualObject(m_VirtualContextDirectory, parent);
-            ItemBase restored = obj.OnRestore(ctx);
-            m_ProcessedItems.Insert(obj);
-            m_FilesToDelete.Insert(virtualFile);
-            ctx.Close();
-        } 
-        parent.VSM_OnAfterRestoreChildren();      
-    }
-
-    void OnVirtualize(ParamsWriteContext ctx, ItemBase childItem)
-    {
-        m_Classname = childItem.GetType();
         InventoryLocation invLocation = new InventoryLocation();
-        childItem.GetInventory().GetCurrentInventoryLocation(invLocation);
+        item.GetInventory().GetCurrentInventoryLocation(invLocation);
 
         m_InvRow = invLocation.GetRow();
         m_InvCol = invLocation.GetCol();
@@ -188,69 +248,108 @@ class VirtualObject : VSM_Base
         m_InvSlotId = invLocation.GetSlot();
         m_InvType = invLocation.GetType();
         m_InvFliped = invLocation.GetFlip();
-
-        VSM_Debug("OnVirtualize", m_Classname + " m_InvRow=" + m_InvRow + " m_InvCol=" + m_InvCol + " m_InvIdX=" + m_InvIdX + " m_InvSlotId=" + m_InvSlotId + " m_InvType=" + m_InvType + " m_InvFliped=" + m_InvFliped);
-        
-        if (childItem.HasQuantity())
-            m_Quantity = childItem.GetQuantity();
-
-        VirtualizeChildren(childItem);
-        OnStoreSave(ctx); //! salvar este contexto antes dos handers
-        
-        // handlers
-        OnRegisterObjectHandler();
-        foreach (VirtualObjectHandler_Base handler : m_Handlers)
-        {
-            if (handler.CanHandler(childItem))
-                handler.Virtualize(ctx, childItem, m_Parent);
-        }    
     }
 
-    void VirtualizeChildren(ItemBase parent)
+    protected void OnGetVariables(ItemBase item)
     {
-        VSM_Debug("VirtualizeChildren", parent.GetType() + " init");
+        if (item.HasQuantity())
+            m_Quantity = item.GetQuantity();
+    }
+
+    protected bool OnVirtualizeChildren(ParamsWriteContext ctx, ParamsWriteContext storeCtx, ItemBase parent, VSMMetadataItem vParent)
+    {
         parent.VSM_OnBeforeVirtualizeChildren();
-        array<EntityAI> items = new array<EntityAI>;
-        parent.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, items);
 
-        int total = items.Count();
-        for (int i = 0; i < total; i++)
+        array<EntityAI> children = new array<EntityAI>;
+        parent.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, children);
+
+        int i;
+        int total = children.Count();
+        ItemBase child;
+
+        for (i = 0; i < total; i++)
         {
-            ItemBase child = ItemBase.Cast(items.Get(i));
-            if (child && child.VSM_CanVirtualize())
-            {
+            child = ItemBase.Cast(children.Get(i));
+            if(child && (!child.VSM_IsVirtualizable() || !CanVirtualizeChildren(child)))
+                return false;
+        }
 
+        for (i = 0; i < total; i++)
+        {
+            child = ItemBase.Cast(children.Get(i));
+            if (child && child.VSM_IsVirtualizable())
+            {
                 VSM_Debug("VirtualizeChildren", child.GetType() + " salvando child" + child.GetType());
 
-                FileSerializer ctx = new FileSerializer();
-                string fileName = child.VSM_GetId() + ".bin";
-                string virtualFile = m_VirtualContextDirectory + fileName;
+                VSMVirtualObject virtualObj = new VSMVirtualObject(m_VirtualContextDirectory, parent);
+                VSMMetadataItem vItem = virtualObj.Virtualize(ctx, storeCtx, child);
                 
-                if (FileExist(virtualFile))
-                    DeleteFile(virtualFile);
-
-                if (!ctx.Open(virtualFile, FileMode.WRITE))
+                if(!vItem)
                 {
-                    VSM_Error("OnStart", "Não foi possível abrir o arquivo virtual para escrever: " + virtualFile);
-                    return;
+                    VSM_Debug("VirtualizeChildren", "O item não pode ser virtualizado" + child);
+                    continue;
                 }
 
-                child.VSM_OnBeforeVirtualize();
-                VirtualObject virtualObj = new VirtualObject(m_VirtualContextDirectory, parent); 
-                virtualObj.OnVirtualize(ctx, child );
-
-                ctx.Close();
-
-                VirtualObjectContext obj = new VirtualObjectContext();
-                obj.virtualId = child.VSM_GetId();
-                obj.contextFile = fileName;
-
-                m_Children.Insert(obj);  
+                vParent.AddChild(vItem);
             }
         }
 
         parent.VSM_OnAfterVirtualizeChildren();
-        VSM_Debug("VirtualizeChildren", "%1 terminado, childrens: %2",parent.GetType(), m_Children.Count().ToString());
+
+        VSM_Debug("VirtualizeChildren", "%1 terminado, childrens: %2",parent.GetType(), vParent.m_Children.Count().ToString());
+        return true;
+    }
+    
+    protected void OnVirtualizeHandlers(ParamsWriteContext ctx, ParamsWriteContext storeCtx, ItemBase item)
+    {
+        OnRegisterObjectHandler();
+        
+        for (int i = 0; i < m_ObjComponents.Count(); i++)
+        {
+            TObjComponent handler = m_ObjComponents.Get(i);
+            handler.OnBeforeVirtualize();
+
+            if (handler.CanHandler(item))
+                handler.Virtualize(ctx, storeCtx, item);
+        }
+    }
+
+    void OnVirtualizeComplete()
+    {
+        for (int i = 0; i < m_ObjComponents.Count(); i++)
+		{
+			TObjComponent handler = m_ObjComponents[i];
+            if(!handler) continue;
+
+            handler.OnVirtualizeComplete();
+        }
+    }
+
+    /*
+     * Utilitários
+     */
+    ItemBase OnSpawn(bool grounded = false)
+    {
+        if(grounded)
+            return SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
+        
+        switch (m_InvType)
+        {
+            case InventoryLocationType.ATTACHMENT:
+                return SpawnItemOnSlot(m_Classname, m_Parent, m_InvSlotId);
+
+            case InventoryLocationType.CARGO:
+            case InventoryLocationType.PROXYCARGO:
+                return SpawnItemOnCargo(m_Classname, m_Parent, m_InvIdX, m_InvRow, m_InvCol, m_InvFliped);
+
+            default:
+                return SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
+        }
+
+        if (VSM_Settings.GetSettings().m_ForceSpawnOnError)
+            return SpawnItemOnGround(m_Classname, m_Parent.GetPosition());
+
+        return null;
     }
 
     ItemBase SpawnItemOnGround(string classname, vector pos)
@@ -265,6 +364,7 @@ class VirtualObject : VSM_Base
         ItemBase item;
 
         VSM_Trace("SpawnItemOnSlot", "classname: %1, container: %2, slotId: %3", classname, container.GetType(), slotId.ToString());
+        container.VSM_SetForceReceiveItems(true);
         container.GetInventory().SetSlotLock(slotId, false);
 
         if (container.IsWeapon() && GetGame().IsKindOf(classname, "Magazine"))
@@ -292,62 +392,48 @@ class VirtualObject : VSM_Base
 
             // item = ItemBase.Cast(container.GetInventory().CreateAttachmentEx(classname, slotId));
         }
+
+        container.VSM_SetForceReceiveItems(false);
         return item;
     }
 
     ItemBase SpawnItemOnCargo(string classname, ItemBase container, int idx, int row, int col, bool isFliped)
     {
+        container.VSM_SetForceReceiveItems(true);
         VSM_Trace("SpawnItemOnCargo", "classname: %1, container: %2, idx: %3, row: %4, col: %5, isFliped: %6", classname, container.GetType(), idx.ToString(), row.ToString(), col.ToString(), isFliped.ToString());
         GameInventory parentInv = GameInventory.Cast(container.GetInventory());
         ItemBase item = ItemBase.Cast(parentInv.CreateEntityInCargoEx(classname, idx, row, col, isFliped));
+        container.VSM_SetForceReceiveItems(false);
         return item;
     }
 
-    bool IsValidSpawnInInv()
+    //TODO: estatico pois é usado como utilitário por outras classes. Isso devia estar aqui?
+    static bool CanVirtualizeChildren(ItemBase item)
     {
-        return m_InvIdX != -1 && m_InvRow != -1 && m_InvRow != -1;
-    }
-
-    int GetVersion()
-    {
-        return m_Version;
-    }
-
-    void SetVersion(int version)
-    {
-        m_Version = version;
-    }
-    
-    void OnRestoreComplete()
-    {
-        foreach (VirtualObjectHandler_Base handler : m_Handlers)
+        array<EntityAI> items = new array<EntityAI>;
+        item.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, items);
+        
+        for (int i = 0; i < items.Count(); i++)
         {
-            handler.OnRestoreComplete();
+            ItemBase itemTest = ItemBase.Cast(items.Get(i));
+            if(itemTest && (!itemTest.VSM_IsVirtualizable() || !CanVirtualizeChildren(itemTest)))
+                return false;
         }
-
-        foreach (VirtualObject obj : m_ProcessedItems) {
-            if (obj) obj.OnRestoreComplete();
-        }
-
-        VSM_Debug("OnComplete", "Iniciando delete de arquivos" + m_FilesToDelete.Count());
-        foreach (string file : m_FilesToDelete) {
-            if (FileExist(file)) {
-                DeleteFile(file);
-                VSM_Debug("OnComplete", "Arquivo de contexto deletado: " + file);
-            }
-            else 
-            {
-                VSM_Debug("OnComplete", "Arquivo de contexto não existe: " + file);
-            }
-        }
-
+        
+        return true;
     }
 
-    void OnVirtualizeComplete()
-    {
-        foreach (VirtualObjectHandler_Base handler : m_Handlers)
-        {
-            handler.OnVirtualizeComplete();
+    private bool ReleaseCtx(ParamsReadContext ctx)
+	{
+        int attempts = 2000;
+        string header;
+
+        while (header != VSM_HeaderType.ITEM_EOF && attempts > 0)
+		{
+            ctx.Read(header);
+            attempts--;
         }
-    }
+
+        return true;
+	}
 }

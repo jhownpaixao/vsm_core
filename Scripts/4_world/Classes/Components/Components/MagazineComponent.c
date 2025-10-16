@@ -1,28 +1,40 @@
-class VSM_MagazineHandler extends VirtualObjectHandler_Base
+/**
+ * @brief Classe para manipulação de carregadores de armas
+ * @note Esta classe é usada para lidar com características específicas de carregadores, como quantidade de munição e perfis de cartuchos
+ */
+class VSMMagazineComponent extends VSMObjectComponent
 {
     int m_Quantity = 0;
     ref array<ref VSM_MagazineCartridgeProfile> m_Cartridges = { };
 
     override bool CanHandler(ItemBase item)
     {
-        return item.IsMagazine();
+        if(!item) return false;
+
+        Magazine magazine = Magazine.Cast(item);
+        if(!magazine || !magazine.IsMagazine()) return false;
+
+        return true;
     }
 
     override bool OnStoreLoad(ParamsReadContext ctx, int version) 
     {
-        if (!ctx.Read(m_Quantity)) return false;
-        if (!ctx.Read(m_Cartridges)) return false;
+        if(version < VSM_StorageVersion.V_0510)
+        {
+            if (!ctx.Read(m_Quantity)) return false;
+            if (!ctx.Read(m_Cartridges)) return false;
+        }
 
         return true;
     }
 
     override void OnStoreSave(ParamsWriteContext ctx) 
     {
-        ctx.Write(m_Quantity);
-        ctx.Write(m_Cartridges);
+        // ctx.Write(m_Quantity);
+        // ctx.Write(m_Cartridges);
     }
     
-    override void OnVirtualize(ItemBase virtualize, ItemBase parent) 
+    override void OnVirtualize(ItemBase virtualize) 
     {
         Magazine magazine = Magazine.Cast(virtualize);
 
@@ -42,10 +54,10 @@ class VSM_MagazineHandler extends VirtualObjectHandler_Base
             m_Cartridges.Insert(cartridge);
         }
 
-        VSM_Debug("OnVirtualize", virtualize.GetType() + "virtualizando m_Quantity=" + m_Quantity);
+        VSM_Trace("OnVirtualize", virtualize.GetType() + "virtualizando m_Quantity=" + m_Quantity);
     }
 
-    override bool OnRestore(ItemBase restored, ItemBase parent) 
+    override bool OnRestore(ItemBase restored) 
     {
         Magazine magazine = Magazine.Cast(restored);
         if(!magazine) 
@@ -53,14 +65,19 @@ class VSM_MagazineHandler extends VirtualObjectHandler_Base
         
         magazine.ServerSetAmmoCount(0);
 
-        foreach (VSM_MagazineCartridgeProfile cartrige : m_Cartridges) {
-            VSM_Debug("VSM_MagazineHandler","cartrige =" + cartrige + "restaurando " + cartrige.m_Classname);
+        for (int i = 0; i < m_Cartridges.Count(); i++)
+		{
+			VSM_MagazineCartridgeProfile cartrige = m_Cartridges[i];
+            if(!cartrige) continue;
+
+            VSM_Trace("VSMMagazineComponent","cartrige =" + cartrige + "restaurando " + cartrige.m_Classname);
             magazine.ServerStoreCartridge(cartrige.m_Damage, cartrige.m_Classname);
         }
 
         magazine.SetSynchDirty();
         magazine.Update();
 
+        VSM_Trace("OnRestore", restored.GetType() + " restaurando m_Quantity=" + m_Quantity);
         return true;
     }
 }

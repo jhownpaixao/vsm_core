@@ -1,11 +1,18 @@
-class VSM_DropQueue : VSM_RestorationQueue
+/** 
+ * @brief Classe de fila para o processo de drop de itens
+ * @note Esta classe é usada para gerenciar o processo de drop de itens, quando um storage é destruido no mundo
+ */
+class VSMDropQueue : VSMRestorationQueue
 {
-    
     override bool OnInit()
     {
-        bool can = super.OnInit();
-        m_ForceSpawnOnGround = true;
-        return can;
+        if(super.OnInit())
+        {
+            m_ForceSpawnOnGround = true;
+            return true;
+        }
+        
+        return false;
     }
 
     override void OnStart()

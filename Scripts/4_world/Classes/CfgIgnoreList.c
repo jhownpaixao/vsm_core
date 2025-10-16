@@ -1,4 +1,4 @@
-class VSM_CfgIgnoreList : VSM_Base
+class VSM_CfgIgnoreList : VSMBase
 {
     array<string> GetList()
     {
