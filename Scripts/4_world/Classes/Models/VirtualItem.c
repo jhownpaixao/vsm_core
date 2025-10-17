@@ -61,8 +61,6 @@ class VSMVirtualItem : VSMBase
             SaveComponents(m_Item, ctx, ctxStore);
 
         m_Item.VSM_OnAfterVirtualize();
-
-        Cleanup();
     }
 
     ItemBase Restore(int version, ItemBase container, ParamsReadContext ctx, ParamsReadContext storeCtx, array<EntityAI> currentItems, bool grounded = false)
@@ -106,14 +104,11 @@ class VSMVirtualItem : VSMBase
         RestoreVirtualChildren(restored, ctx, storeCtx, currentItems);
 
         if(m_Delete)
+        {
             RestoreComponents(restored, ctx, storeCtx);
-
+        }
+            
         restored.VSM_OnAfterRestore();
-
-        m_Cargo.Clear();
-        m_Attachments.Clear();
-        Cleanup();
-
         return restored;
     }
 
@@ -269,16 +264,6 @@ class VSMVirtualItem : VSMBase
         components.Clear();
 
         VSM_Debug("RestoreComponents", "Componentes restaurados para: " + item.GetType());
-    }
-
-    protected void Cleanup()
-    {
-        m_HealthComponent = null;
-        m_QuantityComponent = null;
-        m_AmmunitionComponent = null;
-        m_MagazineComponent = null;
-        m_WeaponComponent = null;
-        m_StoreComponent = null;
     }
 
     /*
