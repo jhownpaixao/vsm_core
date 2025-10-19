@@ -7,8 +7,6 @@ class VSMRestorationQueue extends VSMBulkProcessingQueue
     protected ref VSMVirtualContainer           m_vContainer;
     protected bool                              m_ForceSpawnOnGround;
     protected ref array<ItemBase>               m_SpawnedItems; // versão spawnda do item (para fins de controle)
-    protected ref array<EntityAI>               m_CurrentItems; // itens atuais no inventário do container (provavelmente itens não virtualizaveis)
-
     override bool OnInit()
     {
         if(!super.OnInit()) return false;
@@ -43,9 +41,6 @@ class VSMRestorationQueue extends VSMBulkProcessingQueue
         m_ItemCount             = m_vContainer.m_Cargo.Count();
         m_ForceSpawnOnGround    = false;
         m_SpawnedItems          = new array<ItemBase>;
-        m_CurrentItems          = new array<EntityAI>;
-
-        m_Container.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, m_CurrentItems);
 
         return true;
     }
@@ -66,7 +61,7 @@ class VSMRestorationQueue extends VSMBulkProcessingQueue
         VSMVirtualItem vItem = m_vContainer.m_Cargo.Get(idx);
 
         //! restauração
-        ItemBase restored = vItem.Restore(m_vContainer.m_Version, m_Container, m_Ctx, m_StoreCtx, m_CurrentItems, m_ForceSpawnOnGround);
+        ItemBase restored = vItem.Restore(m_vContainer.m_Version, m_Container, m_Ctx, m_StoreCtx, m_ForceSpawnOnGround);
         if(restored) m_SpawnedItems.Insert(restored);
     }
 

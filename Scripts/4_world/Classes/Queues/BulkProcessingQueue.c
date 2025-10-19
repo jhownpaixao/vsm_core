@@ -37,20 +37,6 @@ class VSMBulkProcessingQueue : VSMBase
         m_StoreCtx                  = new FileSerializer();
     }
 
-    void ~VSMBulkProcessingQueue()
-    {
-        if (m_Ctx && m_Ctx.IsOpen())
-            m_Ctx.Close();
-
-        if (m_StoreCtx && m_StoreCtx.IsOpen())
-            m_StoreCtx.Close();
-
-        m_Container = null;
-        m_Metadata = null;
-        m_Ctx = null;
-        m_StoreCtx = null;
-    }
-
     bool OnInit()
     {
         VSM_Debug("OnInit", m_Container.GetType() + " processamento iniciado");
@@ -59,7 +45,6 @@ class VSMBulkProcessingQueue : VSMBase
         return true;
     }
 
-    
     void OnStart() { }
     void OnTick(int idx) { }
     void OnAfterBatchProcess(int startIdx, int endIdx) { }

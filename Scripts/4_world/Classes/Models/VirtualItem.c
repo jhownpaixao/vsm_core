@@ -53,7 +53,7 @@ class VSMVirtualItem : VSMBase
         m_EntityId = m_Item.GetID();
         m_Classname = m_Item.GetType();
         m_Type = m_Item.GetType();
-        m_Delete = item.VSM_IsVirtualizable();
+        m_Delete = m_Item.VSM_IsVirtualizable();
 
         CreateInvVars(m_Item);
         CreateVirtualChildren(m_Item, ctx, ctxStore);
@@ -63,7 +63,7 @@ class VSMVirtualItem : VSMBase
         m_Item.VSM_OnAfterVirtualize();
     }
 
-    ItemBase Restore(int version, ItemBase container, ParamsReadContext ctx, ParamsReadContext storeCtx, array<EntityAI> currentItems, bool grounded = false)
+    ItemBase Restore(int version, ItemBase container, ParamsReadContext ctx, ParamsReadContext storeCtx, bool grounded = false)
     {
         m_Version = version;
         ItemBase restored;
@@ -78,17 +78,24 @@ class VSMVirtualItem : VSMBase
         }
         else
         {
-            for (int i = 0; i < currentItems.Count(); i++)
+            array<EntityAI> entities = new array<EntityAI>;
+            container.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, entities);
+
+            VSM_Debug("Restore", "Procurando item não virtualizável no inventário: " + m_Classname + " | ID: " + m_EntityId.ToString() + " | Itens atuais: " + entities.Count().ToString());
+
+            for (int i = 0; i < entities.Count(); i++)
             {
-                EntityAI currentItem = currentItems.Get(i);
-                if(currentItem && currentItem.GetID() == m_EntityId)
+                ItemBase currentItem = ItemBase.Cast(entities.Get(i));
+                if(!currentItem) 
+                    continue;
+
+                VSM_Debug("Restore", "Verificando item: " + currentItem.GetType() + " | ID: " + currentItem.GetID().ToString());
+
+                if(currentItem.GetID() == m_EntityId)
                 {
-                    restored = ItemBase.Cast(currentItem);
-                    if(!restored)
-                    {
-                        VSM_Error("Restore", "Falha ao encontrar item não virtualizável no inventário: " + m_Classname + " | ID: " + m_EntityId.ToString());
-                        return null;
-                    }
+                    restored = currentItem;
+                    VSM_Debug("Restore", "Item encontrado no inventário: " + m_Classname + " | ID: " + m_EntityId.ToString());
+                    break;
                 }
             }
         }
@@ -101,7 +108,7 @@ class VSMVirtualItem : VSMBase
 
         restored.VSM_OnBeforeRestore();
 
-        RestoreVirtualChildren(restored, ctx, storeCtx, currentItems);
+        RestoreVirtualChildren(restored, ctx, storeCtx);
 
         if(m_Delete)
         {
@@ -175,7 +182,7 @@ class VSMVirtualItem : VSMBase
         VSM_Debug("CreateVirtualChildren", "%1 terminado, attachments: %2, cargo: %3",container.GetType(), m_Attachments.Count().ToString(), m_Cargo.Count().ToString());
     }
 
-    protected void RestoreVirtualChildren(ItemBase container, ParamsReadContext ctx, ParamsReadContext storeCtx, array<EntityAI> currentItems, bool grounded = false)
+    protected void RestoreVirtualChildren(ItemBase container, ParamsReadContext ctx, ParamsReadContext storeCtx, bool grounded = false)
     {
 		VSMVirtualItem vItem;
 
@@ -184,13 +191,13 @@ class VSMVirtualItem : VSMBase
         for (int i = 0; i < m_Attachments.Count(); i++)
         {
             vItem = m_Attachments.Get(i);
-            vItem.Restore(m_Version, container, ctx, storeCtx, currentItems, grounded);
+            vItem.Restore(m_Version, container, ctx, storeCtx, grounded);
         }
 
         for (int j = 0; j < m_Cargo.Count(); j++)
         {
             vItem = m_Cargo.Get(j);
-            vItem.Restore(m_Version, container, ctx, storeCtx, currentItems, grounded);
+            vItem.Restore(m_Version, container, ctx, storeCtx, grounded);
         }
 
         container.VSM_OnAfterRestoreChildren();
