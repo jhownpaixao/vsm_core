@@ -38,9 +38,12 @@ class VSM_StorageVersion
     
     /** @brief VSM version 14.09 compatibility
      *  @details Fix for new virtualization system implemented in experimental
-     *  Correção para novo sistema de virtualização implementado no experimental */
+     *  Correção para novo sistema de virtualização VPower implementado no experimental */
     static const int V_1409 = 102;
 
+    /** @brief VSM version 05.10 compatibility
+     *  @details Latest storage format with all current features
+     *  Correções de estabilidade e consistência no gerenciamento do VPower */
     static const int V_0510 = 103;
 
     /** @brief Compatibility version for legacy support

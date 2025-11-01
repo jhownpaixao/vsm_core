@@ -14,7 +14,7 @@ class VSMVirtualObject : VSMBase
     int     m_Quantity;
 
     /* Operacional */
-    ref array<ref VSMMetadataItem>                  m_Children;
+    ref array<ref VSMMetadataItem>              m_Children;
     protected string                            m_VirtualContextDirectory;
     protected ItemBase                          m_Parent;
     protected ref array<ref TObjComponent>      m_ObjComponents;

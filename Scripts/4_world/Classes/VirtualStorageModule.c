@@ -104,8 +104,6 @@ class VirtualStorageModule : CF_ModuleWorld
 
 	override void OnMissionFinish(Class sender, CF_EventArgs args)
 	{
-	
-		VSM_Info("OnMissionFinish", " Iniciando processo de fechamento dos containers virtuais");
 		m_IsMissionFinishing = true;
 
 		if (FileExist(GetVirtualDirectory()) && m_Settings.m_IsRemovingModule)
@@ -113,16 +111,6 @@ class VirtualStorageModule : CF_ModuleWorld
 			VirtualUtils.DeleteFiles(GetVirtualDirectory());
 			return;
 		}
-
-		// for (int i = 0; i < m_InitContainers.Count(); i++)
-		// {
-		// 	ItemBase container = m_InitContainers[i];
-		// 	if (container && container.VSM_CanVirtualize() && container.VSM_IsOpen())
-		// 	{
-		// 		VSM_Debug("OnMissionFinish", container.GetType() + " container aberto, fechando...");
-		// 		container.VSM_Close(); //!Ao fechar segue OnSaveVirtualStore
-		// 	}
-		// }
 
 		super.OnMissionFinish(sender, args);
 	}
@@ -244,8 +232,8 @@ class VirtualStorageModule : CF_ModuleWorld
 		
 		VSMMetadata metadata = GetMetadata(container);
 		VSM_Debug("OnProcessContainerInit", container.GetType() + " [Metadata] Versão:" + metadata.GetVersion().ToString() + " - Versão mais recente: " + VSM_StorageVersion.CURRENT_VERSION.ToString());
-		
-		if (metadata.m_Version < VSM_StorageVersion.CURRENT_VERSION)
+
+		if (metadata.m_Version < VSM_StorageVersion.CURRENT_VERSION && (metadata.IsVirtualized() || metadata.IsRestoring()))
 		{
 			VSM_Warn("OnProcessContainerInit", container.GetType() + " container desatualizado, iniciando migração...");
 			OnMigrate(container, metadata);
@@ -427,12 +415,16 @@ class VirtualStorageModule : CF_ModuleWorld
 
 		VSM_Debug("OnMigrate", "Iniciando migração de " + container.GetType() + " para a versão atual do VSM");
 
-		VSMLegacyRestorationQueue restoreQueue = new VSMLegacyRestorationQueue(container);
-		m_ActiveQueues.Insert(container.VSM_GetId(), restoreQueue);
+		if (metadata.m_Version == VSM_StorageVersion.V_1409)
+		{
+			VSMLegacyRestorationQueue restoreQueue = new VSMLegacyRestorationQueue(container);
+			m_ActiveQueues.Insert(container.VSM_GetId(), restoreQueue);
 
-		container.VSM_SetIgnoreVirtualization(true);
-		container.VSM_Open();
-		GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).Call(restoreQueue.Start);
+			container.VSM_SetIgnoreVirtualization(true);
+			container.VSM_Open();
+			GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).Call(restoreQueue.Start);
+			container.VSM_SetVirtualLoaded(true);
+		}
 	}
 
 	void ProcessContainersInit()
