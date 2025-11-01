@@ -63,20 +63,15 @@ class VSMVirtualItem : VSMBase
         m_Item.VSM_OnAfterVirtualize();
     }
 
-    ItemBase Restore(int version, ItemBase container, ParamsReadContext ctx, ParamsReadContext storeCtx, bool grounded = false)
+    RestoreResult Restore(int version, ItemBase container, ParamsReadContext ctx, StoreParam store, bool grounded = false)
     {
         m_Version = version;
-        ItemBase restored;
+        ItemBase item;
+        RestoreResult result = new RestoreResult(item, true);
 
         VSM_Debug("Restore", "Iniciando restauração do item: " + m_Classname + " com versão: " + m_Version.ToString() + " | ID: " + m_EntityId.ToString() + " | Deletável: " + m_Delete.ToString());
 
-        if(m_Delete)
-        {
-            restored = ItemBase.Cast(SpawnEntity(container, grounded));
-            if(!restored)
-                return null; 
-        }
-        else
+        if(!m_Delete)
         {
             array<EntityAI> entities = new array<EntityAI>;
             container.GetInventory().EnumerateInventory(InventoryTraversalType.LEVELORDER, entities);
@@ -93,30 +88,35 @@ class VSMVirtualItem : VSMBase
 
                 if(currentItem.GetID() == m_EntityId)
                 {
-                    restored = currentItem;
+                    result.param1 = currentItem;
                     VSM_Debug("Restore", "Item encontrado no inventário: " + m_Classname + " | ID: " + m_EntityId.ToString());
                     break;
                 }
             }
         }
 
-        if(!restored)
+        //spawna o item se não for encontrado no inventário (quando foi deletado/virtualizado, ou está ausente)
+        if(m_Delete || (!m_Delete && !result.param1))
+            result.param1 = ItemBase.Cast(SpawnEntity(container, grounded));
+        
+        if(result.param1)
+        {
+            result.param1.VSM_OnBeforeRestore();
+
+            if(!RestoreVirtualChildren(result.param1, ctx, store))
+                result.param2 = false;
+
+            if(m_Delete && !RestoreComponents(result.param1, ctx, store))
+                result.param2 = false;
+                
+            result.param1.VSM_OnAfterRestore();
+        }
+        else
         {
             VSM_Error("Restore", "Falha ao restaurar item: " + m_Classname + " em: " + container.GetType() + " | ID: " + m_EntityId.ToString());
-            return null;
         }
 
-        restored.VSM_OnBeforeRestore();
-
-        RestoreVirtualChildren(restored, ctx, storeCtx);
-
-        if(m_Delete)
-        {
-            RestoreComponents(restored, ctx, storeCtx);
-        }
-            
-        restored.VSM_OnAfterRestore();
-        return restored;
+        return result;
     }
 
     protected void CreateInvVars(ItemBase item)
@@ -182,7 +182,7 @@ class VSMVirtualItem : VSMBase
         VSM_Debug("CreateVirtualChildren", "%1 terminado, attachments: %2, cargo: %3",container.GetType(), m_Attachments.Count().ToString(), m_Cargo.Count().ToString());
     }
 
-    protected void RestoreVirtualChildren(ItemBase container, ParamsReadContext ctx, ParamsReadContext storeCtx, bool grounded = false)
+    protected bool RestoreVirtualChildren(ItemBase container, ParamsReadContext ctx, StoreParam store, bool grounded = false)
     {
 		VSMVirtualItem vItem;
 
@@ -191,16 +191,17 @@ class VSMVirtualItem : VSMBase
         for (int i = 0; i < m_Attachments.Count(); i++)
         {
             vItem = m_Attachments.Get(i);
-            vItem.Restore(m_Version, container, ctx, storeCtx, grounded);
+            vItem.Restore(m_Version, container, ctx, store, grounded);
         }
 
         for (int j = 0; j < m_Cargo.Count(); j++)
         {
             vItem = m_Cargo.Get(j);
-            vItem.Restore(m_Version, container, ctx, storeCtx, grounded);
+            vItem.Restore(m_Version, container, ctx, store, grounded);
         }
 
         container.VSM_OnAfterRestoreChildren();
+        return true;
     } 
 
     protected void SaveComponents(ItemBase item, ParamsWriteContext ctx, ParamsWriteContext storeCtx)
@@ -238,7 +239,7 @@ class VSMVirtualItem : VSMBase
         VSM_Debug("SaveComponents", "Componentes salvos para: " + item.GetType());
     }
 
-    protected void RestoreComponents(ItemBase item, ParamsReadContext ctx, ParamsReadContext storeCtx)
+    protected bool RestoreComponents(ItemBase item, ParamsReadContext ctx, StoreParam store)
     {
         VSM_Debug("RestoreComponents", "Restaurando componentes para: " + item.GetType());
         array<VSMObjectComponent> components = new array<VSMObjectComponent>;
@@ -258,19 +259,26 @@ class VSMVirtualItem : VSMBase
         if (m_WeaponComponent.CanHandler(item))
             components.Insert(m_WeaponComponent);
 
-        if (m_StoreComponent.CanHandler(item))
-            components.Insert(m_StoreComponent);
-
         for (int i = 0; i < components.Count(); i++)
         {
             VSMObjectComponent component = components.Get(i);
             component.OnBeforeRestore();
-            component.Restore(ctx, storeCtx, m_Version, item);
+            component.Restore(ctx, store.param2, m_Version, item);
         }
 
+        //--- processamento extra para contexto dos arquivos...
+        if(store.param1 && m_StoreComponent.CanHandler(item))
+        {
+            m_StoreComponent.OnBeforeRestore();
+            
+            if(!m_StoreComponent.Restore(ctx, store.param2, m_Version, item))
+                return false;
+        }
+            
         components.Clear();
 
         VSM_Debug("RestoreComponents", "Componentes restaurados para: " + item.GetType());
+        return true;
     }
 
     /*
@@ -358,3 +366,6 @@ class VSMVirtualItem : VSMBase
         return item;
     }
 }
+
+typedef Param2<bool, ParamsReadContext> StoreParam;
+typedef Param2<ItemBase, bool> RestoreResult;

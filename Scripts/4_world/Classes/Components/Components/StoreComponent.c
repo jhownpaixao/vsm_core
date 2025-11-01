@@ -27,7 +27,10 @@ class VSMStoreComponent extends VSMObjectComponent
         }
 
         if(!restored.VSM_OnVirtualStoreLoad(m_StoreCtx, version))
+        {
             VSM_Debug("OnRestore","%1 falha na restauração do contexto, vesão: %2", restored.GetType(), version.ToString());
+            return false;
+        }
 
         string blockEnd;
         if (!m_StoreCtx.Read(blockEnd) || blockEnd != "EOF")

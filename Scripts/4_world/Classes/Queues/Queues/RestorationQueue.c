@@ -7,6 +7,7 @@ class VSMRestorationQueue extends VSMBulkProcessingQueue
     protected ref VSMVirtualContainer           m_vContainer;
     protected bool                              m_ForceSpawnOnGround;
     protected ref array<ItemBase>               m_SpawnedItems; // versão spawnda do item (para fins de controle)
+    protected bool                              m_LastProcessStoreCtx;
     override bool OnInit()
     {
         if(!super.OnInit()) return false;
@@ -40,6 +41,7 @@ class VSMRestorationQueue extends VSMBulkProcessingQueue
 
         m_ItemCount             = m_vContainer.m_Cargo.Count();
         m_ForceSpawnOnGround    = false;
+        m_LastProcessStoreCtx   = true;
         m_SpawnedItems          = new array<ItemBase>;
 
         return true;
@@ -59,10 +61,15 @@ class VSMRestorationQueue extends VSMBulkProcessingQueue
     override void OnTick(int idx)
     {
         VSMVirtualItem vItem = m_vContainer.m_Cargo.Get(idx);
+    
+        StoreParam store = new StoreParam(m_LastProcessStoreCtx, m_StoreCtx);
+        RestoreResult restored = vItem.Restore(m_vContainer.m_Version, m_Container, m_Ctx, store, m_ForceSpawnOnGround);
+        
+        if(restored.param1) 
+            m_SpawnedItems.Insert(restored.param1);
 
-        //! restauração
-        ItemBase restored = vItem.Restore(m_vContainer.m_Version, m_Container, m_Ctx, m_StoreCtx, m_ForceSpawnOnGround);
-        if(restored) m_SpawnedItems.Insert(restored);
+        if(m_LastProcessStoreCtx && !restored.param2)
+            m_LastProcessStoreCtx = false;
     }
 
     override void OnComplete()

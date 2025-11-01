@@ -209,8 +209,9 @@ class VirtualStorageModule : CF_ModuleWorld
 
 		if (!container || container.VSM_IsLoaded())
 			return;
-
-		if (!container.VSM_CanVirtualize())
+	
+		//!Por algum motivo sem o VSM_InPlayer se o player logar com storage na mão, ele é virtualizado e fechado, então ao abrir nao tem nada pois o id dele vai mudar...
+		if (!container.VSM_CanVirtualize() || container.VSM_InPlayer())
 		{
 			container.VSM_SetVirtualLoaded(true);
 			return;

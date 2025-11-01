@@ -410,12 +410,10 @@ modded class ItemBase
      */
     bool VSM_InPlayer()
     {
-        EntityAI parent = EntityAI.Cast(GetHierarchyParent());
-        if (parent && parent.IsInherited(PlayerBase))
-        {
+        PlayerBase player = PlayerBase.Cast(GetHierarchyRootPlayer());
+        if (player)
             return true;
-        }
-
+        
         return false;
     }
 
@@ -430,7 +428,7 @@ modded class ItemBase
      */
     bool VSM_CanManipule(int requiredOpen = 1)
     {
-        if(VSM_CanVirtualize())
+        if(!GetGame().IsDedicatedServer() &&VSM_CanVirtualize())
         {
             bool can = true;
 

@@ -44,7 +44,7 @@ class VSMGameLabsIntegration
             case VSM_ReportAction.TAKE:
             {
                 float distance = vector.Distance(m_Player.GetPosition(), pos);
-                return "[VSM]: Taking item from container: distance " + distance.ToString() + " at " + pos.ToString();
+                return "[VSM]: Taking container: player distance from container " + distance.ToString() + " at " + pos.ToString();
             }
                 
         }
